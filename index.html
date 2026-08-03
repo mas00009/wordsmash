@@ -222,7 +222,14 @@
      installed iOS, so nothing readable lives down there */
   .verbadge { position: relative; z-index: 2; margin-top: 14px; text-align: center;
     font-size: 10px; font-weight: 700; letter-spacing: .08em;
-    color: rgba(255,255,255,.42); pointer-events: none; }
+    color: rgba(255,255,255,.42); }
+  /* tap the version: coloured bars, each pinned a different way — whichever
+     colour reaches the physical bottom edge is the anchoring iOS honours */
+  .dbgbar { position: fixed; top: 0; width: 8px; z-index: 200; pointer-events: none; }
+  .dbgbar.r { right: 2px;  background: #ff3355; height: 100lvh; }
+  .dbgbar.y { right: 14px; background: #ffd100; height: 100vh; }
+  .dbgbar.c { right: 26px; background: #00e5ff; bottom: 0; height: auto; }
+  .dbgbar.g { right: 38px; background: #43e97b; height: 100svh; }
   /* strapline + its rule travel together as one block, so the even spacing
      applies between logo / strapline / buttons and not inside the pair */
   .tagblock { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 9px;
@@ -535,7 +542,8 @@
   .joinbg { display: none; position: fixed; top: 0; left: 50%; transform: translateX(-50%);
     width: min(100vw, 480px); height: 100%; height: 100lvh;
     object-fit: cover; object-position: center bottom; z-index: 0; }
-  .live-view.artbg .joinbg { display: block; }
+  body.bg-video .joinbg { display: block; }
+  body.bg-video .live-view { background: transparent; }
   /* The first stop is the app bar's own #0b1019 so there's no colour step where
      the body meets the header; it fades to the artwork further down. */
   .live-view.artbg::after { content: ""; position: fixed; top: 0; left: 50%;
@@ -683,7 +691,6 @@
      the solo team setup and the winners page — via the "vid" class, under a
      slightly stronger veil so cards and buttons stay legible. Mid-game turns
      stay on the plain backdrop so the word is the loudest thing on screen. */
-  .live-view.vid .joinbg { display: block; }
   .live-view.vid::after { content: ""; position: fixed; top: 0; left: 50%;
     transform: translateX(-50%); width: min(100vw, 480px); height: 100%; height: 100lvh;
     z-index: 1; pointer-events: none;
@@ -999,9 +1006,9 @@
   <canvas class="fxcanvas" id="fxCanvas"></canvas>
   <div class="fxbanner" id="fxBanner"></div>
 
+  <video class="joinbg" id="joinBg" src="./join-bg.webm" poster="./join-bg.jpg"
+         muted loop playsinline preload="auto" aria-hidden="true"></video>
   <div class="live-view" id="liveView">
-    <video class="joinbg" id="joinBg" src="./join-bg.webm" poster="./join-bg.jpg"
-           muted loop playsinline preload="auto" aria-hidden="true"></video>
     <div class="live-inner" id="liveInner"></div>
   </div>
 
@@ -1136,6 +1143,18 @@ if ((navigator.standalone === true) ||
 fetch("./sw.js").then(r => r.text()).then(t => {
   const m = t.match(/wordsmash-(v\d+)/);
   if (m && $("verBadge")) $("verBadge").textContent = m[1];
+  // tap the version to toggle the anchoring test bars
+  if ($("verBadge")) $("verBadge").addEventListener("click", () => {
+    if (document.querySelector(".dbgbar")) {
+      document.querySelectorAll(".dbgbar").forEach(el => el.remove());
+      return;
+    }
+    for (const k of ["r", "y", "c", "g"]) {
+      const d = document.createElement("div");
+      d.className = "dbgbar " + k;
+      document.body.appendChild(d);
+    }
+  });
 }).catch(() => {});
 const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
 const LS_KEY = "masgames_or_key", LS_MODEL = "masgames_or_model", LS_DECK = "masgames_deck", LS_GROUP = "masgames_group";
@@ -1253,6 +1272,8 @@ function syncHomeMark(){
   document.body.classList.toggle("chrome-bare", bare);
   document.body.classList.toggle("is-home", onHome);   // home-only background
   document.body.classList.toggle("in-game", lv.contains("game"));
+  document.body.classList.toggle("bg-video",
+    lv.contains("open") && (lv.contains("artbg") || lv.contains("vid")));
   // the home screen must not show (or keep its video decoding) behind a game
   const liveOpen = lv.contains("open");
   const em = $("empty"); if (em) em.style.visibility = liveOpen ? "hidden" : "";
