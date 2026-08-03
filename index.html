@@ -81,6 +81,7 @@
      browser leaves uncovered (toolbar dance, safe areas) blends invisibly */
   body.in-game, body.in-game .app { background: #0b1019; }
   body.is-home header.bar { background: transparent; }
+  body.chrome-bare header.bar { background: transparent; }
   body.is-home .empty { background: none; }
   /* branding only — resetting moved to Menu -> Reset game */
   .brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-width: 0; border-radius: 12px; }
@@ -537,8 +538,11 @@
   .live-view.artbg .joinbg { display: block; }
   /* The first stop is the app bar's own #0b1019 so there's no colour step where
      the body meets the header; it fades to the artwork further down. */
-  .live-view.artbg::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-    background: linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.86) 22%, rgba(11,16,25,.45) 45%, rgba(11,16,25,0) 66%); }
+  .live-view.artbg::after { content: ""; position: fixed; top: 0; left: 50%;
+    transform: translateX(-50%); width: min(100vw, 480px); height: 100%; height: 100lvh;
+    z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, rgba(11,16,25,.55) 0%, rgba(11,16,25,.96) 13%,
+      rgba(11,16,25,.86) 31%, rgba(11,16,25,.45) 52%, rgba(11,16,25,0) 70%); }
   .live-inner { position: relative; z-index: 2; }
   .joinbody { justify-content: center; padding-bottom: 32%; overflow: hidden; }
   .joincard { width: 100%; max-width: 330px; margin: 0 auto; display: flex; flex-direction: column;
@@ -680,9 +684,11 @@
      slightly stronger veil so cards and buttons stay legible. Mid-game turns
      stay on the plain backdrop so the word is the loudest thing on screen. */
   .live-view.vid .joinbg { display: block; }
-  .live-view.vid::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-    background: linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%,
-      rgba(11,16,25,.62) 44%, rgba(11,16,25,.34) 100%); }
+  .live-view.vid::after { content: ""; position: fixed; top: 0; left: 50%;
+    transform: translateX(-50%); width: min(100vw, 480px); height: 100%; height: 100lvh;
+    z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, rgba(11,16,25,.55) 0%, rgba(11,16,25,.96) 13%,
+      rgba(11,16,25,.9) 27%, rgba(11,16,25,.62) 51%, rgba(11,16,25,.34) 100%); }
   .gs { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .gs-head { flex: none; text-align: center; margin-bottom: 12px; }
   .gs-title { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: -.6px; color: #fff;
