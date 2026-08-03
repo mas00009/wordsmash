@@ -13,7 +13,7 @@
 <link rel="icon" type="image/png" href="./icon-192.png" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Word Smash" />
 
 <style>
@@ -41,12 +41,12 @@
      collapsed toolbars) — end it in the same purple-black as the artwork so
      no hard edge can ever show below the app. */
   html { margin: 0; padding: 0; height: 100%; overscroll-behavior: none;
-    background: linear-gradient(180deg, #0b1019 0%, #0b0c1a 70%, #0d0a1c 100%); }
+    background: #0b1019; }
   body { margin: 0; padding: 0; position: fixed; top: 0; left: 0; right: 0;
     height: 100%; height: 100lvh; overflow: hidden; overscroll-behavior: none; }
   body {
     font-family: ui-rounded, "SF Pro Rounded", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
+    background: #0b1019; color: var(--ink); -webkit-font-smoothing: antialiased;
   }
   button, input, select, textarea { font-family: inherit; }
 
@@ -76,6 +76,7 @@
      between those three tones showed as bands. Only .app paints now. */
   /* flat near-black so the bar melts into the video's own dark starfield */
   body.is-home .app { background: #04060c; }
+  body.is-home { background: #04060c; }
   /* in a game the body, app and live view share one colour: any strip the
      browser leaves uncovered (toolbar dance, safe areas) blends invisibly */
   body.in-game, body.in-game .app { background: #0b1019; }
@@ -202,7 +203,7 @@
      logo → strapline → buttons cadence the old three-block layout had. */
   .empty { position: relative; flex: 1; display: flex; flex-direction: column;
     align-items: center; justify-content: flex-start; gap: 0;
-    text-align: center; padding: 40vh 18px calc(12px + var(--sab)); color: var(--muted); min-height: 0;
+    text-align: center; padding: 40vh 18px max(calc(12px + var(--sab)), 40px); color: var(--muted); min-height: 0;
     background: #04060c; }
   /* Pinned to the physical screen (largest viewport), not the layout box —
      flex rounding and browser chrome left slivers below a box-anchored video.
@@ -214,11 +215,11 @@
   .homeveil { position: fixed; top: 0; left: 50%; transform: translateX(-50%);
     width: min(100vw, 480px); height: 100%; height: 100lvh; z-index: 1; pointer-events: none;
     background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
-      rgba(4,6,12,0) 52%, rgba(4,6,12,.72) 84%, rgba(4,6,12,.92) 100%); }
+      rgba(4,6,12,0) 52%, rgba(4,6,12,.72) 86%, #04060c 100%); }
   .empty .tagblock, .empty .home-actions { position: relative; z-index: 2; }
-  .verbadge { position: absolute; left: 0; right: 0; bottom: calc(16px + var(--sab));
-    z-index: 2; text-align: center; font-size: 9px; font-weight: 700;
-    letter-spacing: .08em; color: rgba(255,255,255,.26); pointer-events: none; }
+  .verbadge { position: absolute; left: 0; right: 0; bottom: max(calc(14px + var(--sab)), 18px);
+    z-index: 2; text-align: center; font-size: 10px; font-weight: 700;
+    letter-spacing: .08em; color: rgba(255,255,255,.42); pointer-events: none; }
   /* strapline + its rule travel together as one block, so the even spacing
      applies between logo / strapline / buttons and not inside the pair */
   .tagblock { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 9px;
@@ -441,7 +442,8 @@
       radial-gradient(620px 460px at 50% 118%, rgba(138,43,226,.30) 0%, transparent 62%),
       #0b1019; display: none; flex-direction: column; }
   .live-view.open { display: flex; }
-  .live-inner { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 8px 16px calc(12px + var(--sab)); }
+  .live-inner { flex: 1; display: flex; flex-direction: column; min-height: 0;
+    padding: 8px 16px max(calc(12px + var(--sab)), 40px); }
   .live-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .live-top .lt-title { font-weight: 900; font-size: 17px; }
   .live-top .lt-sub { font-size: 12px; color: var(--muted); font-weight: 600; }
@@ -522,7 +524,7 @@
   /* The first stop is the app bar's own #0b1019 so there's no colour step where
      the body meets the header; it fades to the artwork further down. */
   .live-view.artbg::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-    background: linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.86) 22%, rgba(11,16,25,.45) 45%, rgba(11,16,25,0) 66%); }
+    background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - 52px), #0b1019 100%), linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.86) 22%, rgba(11,16,25,.45) 45%, rgba(11,16,25,0) 66%); }
   .live-inner { position: relative; z-index: 2; }
   .joinbody { justify-content: center; padding-bottom: 32%; overflow: hidden; }
   .joincard { width: 100%; max-width: 330px; margin: 0 auto; display: flex; flex-direction: column;
@@ -665,7 +667,8 @@
      stay on the plain backdrop so the word is the loudest thing on screen. */
   .live-view.vid .joinbg { display: block; }
   .live-view.vid::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-    background: linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%,
+    background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - 52px), #0b1019 100%),
+      linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%,
       rgba(11,16,25,.62) 44%, rgba(11,16,25,.34) 100%); }
   .gs { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .gs-head { flex: none; text-align: center; margin-bottom: 12px; }
