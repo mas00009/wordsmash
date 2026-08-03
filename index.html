@@ -246,7 +246,7 @@
   .home-actions { flex: 0 0 auto; width: 100%; max-width: 250px; display: flex; flex-direction: column; gap: 8px; }
   .spinner { width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; vertical-align: -3px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100px + var(--sab)); background: rgba(0,0,0,.82); color: #fff; padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 700; z-index: 40; max-width: 88%; text-align: center; }
+  .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100px + var(--sab)); background: rgba(0,0,0,.82); color: #fff; padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 700; z-index: 40; max-width: calc(100% - 20px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
   .toast.err { background: var(--danger); }
 
   /* Overlays sit BELOW the persistent header (--headerH set from JS) */
@@ -426,6 +426,7 @@
      off an html.pwa class set from JS because the display-mode media query
      does not match on-device even when running installed. */
   html.pwa .live-inner { padding-bottom: max(calc(12px + var(--sab)), calc(var(--sat) + 18px)); }
+
   html.pwa .empty { padding-bottom: max(calc(12px + var(--sab)), calc(var(--sat) + 12px)); }
   html.pwa .homeveil { height: var(--vpH, 100lvh);
     background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
@@ -831,11 +832,12 @@
   .gs.draw .drawtools { flex: none; }
 
   /* Buttons: one gradient pill per screen, ghosts for the rest. */
+  /* no glow: the halo bled into the screen-bottom vignette and spotlighted
+     the strip iOS won't let us paint */
   .gbtn { flex: 1; appearance: none; border: none; cursor: pointer; display: flex;
     align-items: center; justify-content: center; gap: 9px; padding: 14px;
     border-radius: 999px; font-size: 16px; font-weight: 900; color: #fff;
-    background: linear-gradient(100deg, var(--cyan), #6a5bff 55%, #c840ff);
-    box-shadow: 0 10px 34px rgba(106,91,255,.42), 0 0 22px rgba(0,229,255,.22); }
+    background: linear-gradient(100deg, var(--cyan), #6a5bff 55%, #c840ff); }
   .gbtn svg { width: 18px; height: 18px; flex: none; }
   .gbtn:active { transform: translateY(2px); }
   .gbtn:disabled { opacity: .45; box-shadow: none; cursor: default; transform: none; }
