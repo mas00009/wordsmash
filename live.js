@@ -684,11 +684,13 @@
         || '<span class="lhint">No one yet…</span>';
     } else if (st.phase === "play") {
       if ($("liveScores")) $("liveScores").innerHTML = scoreStrip();
-      // one pip per correct answer = one space on the board, on a track that
-      // never shrinks below six so the row doesn't jump as they come in
+      // one pip per correct answer = one space on the board. The track is a
+      // fixed six pips — a hot streak becomes "+N" instead of wrapping to a
+      // second row and shoving the buttons off the bottom of the screen.
       const tl = $("tally"), n = st.correct || 0;
-      if (tl) tl.innerHTML = Array.from({ length: Math.max(6, n) },
-        (_, i) => `<span class="pip ${i < n ? "on" : ""}"></span>`).join("");
+      if (tl) tl.innerHTML = Array.from({ length: 6 },
+        (_, i) => `<span class="pip ${i < Math.min(n, 6) ? "on" : ""}"></span>`).join("")
+        + (n > 6 ? `<span class="pipmore">+${n - 6}</span>` : "");
       if (st.spinResult && st.spinResult.places) {
         const k = liveCode + "|" + (st.spinResult.id || st.spinResult.label);
         if (spinFxKey !== k) {
@@ -735,7 +737,7 @@
   // ---------- drawing (DRAW category) ----------
   function drawArea(canDraw) {
     const sw = canDraw ? `<div class="drawtools">${DRAW_COLORS.map((c, i) => `<span class="swatch ${i === drawColorIdx ? "sel" : ""}" data-ci="${i}" style="background:${c}"></span>`).join("")}<button class="chip" id="clearDraw">Clear</button></div>` : "";
-    return `<div class="gpanel"><div class="drawwrap"><canvas class="drawcanvas" id="drawCanvas" width="${CANVAS_RES}" height="${CANVAS_RES}"></canvas></div>${sw}</div>`;
+    return `<div class="gpanel drawpanel"><div class="drawwrap"><canvas class="drawcanvas" id="drawCanvas" width="${CANVAS_RES}" height="${CANVAS_RES}"></canvas></div>${sw}</div>`;
   }
   function setupCanvas(canDraw) {
     const cv = $("drawCanvas"); if (!cv) return;

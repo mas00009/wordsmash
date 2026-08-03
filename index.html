@@ -57,7 +57,7 @@
   header.bar {
     /* Persistent app bar: stays on top of every screen/overlay */
     display: flex; align-items: center; gap: 8px; position: relative; flex: 0 0 auto;
-    padding: calc(10px + var(--sat)) 14px 12px; z-index: 80;
+    padding: calc(8px + var(--sat)) 14px 8px; z-index: 80;
     background: #0b1019;
   }
   header.bar::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 0; height: 2px; border-radius: 2px;
@@ -70,6 +70,9 @@
      between those three tones showed as bands. Only .app paints now. */
   /* flat near-black so the bar melts into the video's own dark starfield */
   body.is-home .app { background: #04060c; }
+  /* in a game the body, app and live view share one colour: any strip the
+     browser leaves uncovered (toolbar dance, safe areas) blends invisibly */
+  body.in-game, body.in-game .app { background: #0b1019; }
   body.is-home header.bar { background: transparent; }
   body.is-home .empty { background: none; }
   /* branding only — resetting moved to Menu -> Reset game */
@@ -121,7 +124,7 @@
   .iconbtn.chip { color: var(--cyan); font-size: 17px; text-shadow: 0 0 8px rgba(0,229,255,.6); }
   /* the menu gear gets a thin ring only — a filled chip would fight the icon's
      own glow, and the header icons are meant to read as icons, not boxes */
-  .iconbtn.ring { width: 38px; height: 38px; border-radius: 50%;
+  .iconbtn.ring { width: 34px; height: 34px; border-radius: 50%;
     border: 1.5px solid rgba(0,229,255,.5);
     box-shadow: 0 0 14px rgba(0,229,255,.16), inset 0 0 12px rgba(0,229,255,.07); }
   /* Header icons: Mas's icon pack, ONE 72px file each (deliberately no srcset).
@@ -427,7 +430,7 @@
       radial-gradient(620px 460px at 50% 118%, rgba(138,43,226,.30) 0%, transparent 62%),
       #0b1019; display: none; flex-direction: column; }
   .live-view.open { display: flex; }
-  .live-inner { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: calc(12px + var(--sat)) 16px calc(14px + var(--sab)); }
+  .live-inner { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 8px 16px calc(12px + var(--sab)); }
   .live-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .live-top .lt-title { font-weight: 900; font-size: 17px; }
   .live-top .lt-sub { font-size: 12px; color: var(--muted); font-weight: 600; }
@@ -654,10 +657,10 @@
     background: linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%,
       rgba(11,16,25,.62) 44%, rgba(11,16,25,.34) 100%); }
   .gs { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .gs-head { flex: none; text-align: center; margin-bottom: 16px; }
-  .gs-title { margin: 0; font-size: 29px; font-weight: 900; letter-spacing: -.6px; color: #fff;
+  .gs-head { flex: none; text-align: center; margin-bottom: 12px; }
+  .gs-title { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: -.6px; color: #fff;
     text-shadow: 0 4px 26px rgba(0,0,0,.6); }
-  .gs-head .tagrule { margin: 13px auto 0; }
+  .gs-head .tagrule { margin: 10px auto 0; }
   .gs-sub { margin: 12px 0 0; font-size: 14px; font-weight: 700; color: #b3c0da; }
   /* Long screens (lobby, teams) scroll from the top; short ones centre. Centring
      an overflowing column clips its head, so it's opt-in rather than default. */
@@ -670,10 +673,10 @@
   .gs-body.mid { justify-content: center; justify-content: safe center;
     padding-bottom: clamp(0px, 9vh, 96px); }
   .gs-body.mid .gs-head { margin-bottom: 6px; }
-  .gs-foot { flex: none; display: flex; gap: 10px; padding-top: 16px; }
+  .gs-foot { flex: none; display: flex; gap: 10px; padding-top: 12px; }
 
   /* Panel — the same gradient hairline as the pickers and code cells. */
-  .gpanel { border-radius: 18px; border: 2px solid transparent; padding: 15px;
+  .gpanel { border-radius: 18px; border: 2px solid transparent; padding: 13px;
     background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
                 linear-gradient(150deg, rgba(0,229,255,.35), rgba(138,43,226,.35)) border-box; }
   .gpanel > h4 { margin: 0 0 12px; font-size: 10.5px; font-weight: 900; letter-spacing: .16em;
@@ -684,25 +687,25 @@
      on the TV carries the full scoreboard, so the phone stays quiet. */
   .teamsbar { display: flex; align-items: center; justify-content: center; gap: 8px;
     flex-wrap: wrap; }
-  .tb { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px;
-    padding: 8px 13px; border: 2px solid transparent; opacity: .72;
-    font-size: 13px; font-weight: 800; color: #c2cde6;
+  .tb { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px;
+    padding: 6px 11px; border: 2px solid transparent; opacity: .72;
+    font-size: 12px; font-weight: 800; color: #c2cde6;
     background: linear-gradient(180deg, rgba(12,17,32,.9), rgba(8,11,24,.9)) padding-box,
                 linear-gradient(140deg, var(--t1), var(--t2)) border-box; }
-  .tb i { width: 11px; height: 11px; border-radius: 50%; flex: none;
+  .tb i { width: 9px; height: 9px; border-radius: 50%; flex: none;
     background: linear-gradient(160deg, var(--t1), var(--t2)); }
   .tb b { color: #fff; font-variant-numeric: tabular-nums; }
-  .tb.on { opacity: 1; padding: 11px 17px; font-size: 15px;
+  .tb.on { opacity: 1; padding: 9px 15px; font-size: 13.5px;
     background: linear-gradient(180deg, rgba(12,17,32,.94), rgba(8,11,24,.94)) padding-box,
                 linear-gradient(120deg, var(--t1), var(--t2)) border-box;
     box-shadow: 0 0 18px -4px var(--t1); }
-  .tb.on i { width: 13px; height: 13px; box-shadow: 0 0 10px var(--t1); }
+  .tb.on i { width: 11px; height: 11px; box-shadow: 0 0 10px var(--t1); }
   .tb.on b { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tb.on small { font-size: 12px; font-weight: 800; color: #8b99b8;
     letter-spacing: .06em; }
 
   /* Countdown ring — reads at arm's length across the room. */
-  .ring { position: relative; width: 154px; height: 154px; margin: 0 auto; flex: none; }
+  .ring { position: relative; width: 136px; height: 136px; margin: 0 auto; flex: none; }
   .ring svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
   .ring .trk { fill: none; stroke: rgba(255,255,255,.08); stroke-width: 9; }
   /* Brand-gradient sweep — the category colour lives on the word card, so the
@@ -734,6 +737,7 @@
   .tally .pip.on { background: linear-gradient(160deg, var(--pink), var(--violet));
     box-shadow: 0 0 10px rgba(255,47,208,.6); animation: pippop .35s cubic-bezier(.2,1.6,.4,1); }
   @keyframes pippop { 0% { transform: scale(.2); } 60% { transform: scale(1.5); } 100% { transform: scale(1); } }
+  .tally .pipmore { font-size: 12px; font-weight: 900; color: var(--cyan); margin-left: 2px; }
 
   /* The word itself, in its category's colours. Text uses the category's own ink
      so yellow and cyan cards stay readable instead of white-on-bright. */
@@ -760,7 +764,7 @@
   /* the fit is exact, so no scrolling and none of .mid's bottom bias —
      with them the screen overflowed by its own padding and scrolled */
   .gs.draw .gs-body { gap: 10px; padding-bottom: 0; overflow-y: hidden; }
-  .gs.draw .ring { width: 92px; height: 92px; }
+  .gs.draw .ring { width: 78px; height: 78px; }
   .gs.draw .ring .num b { font-size: 30px; }
   .gs.draw .ring .num small { display: none; }
   .gs.draw .ring .trk, .gs.draw .ring .prg { stroke-width: 12; }
@@ -768,15 +772,18 @@
   .gs.draw .wordcard .w { margin-top: 9px; font-size: 23px; }
   .gs.draw .wordcard .v { display: none; }
   .gs.draw .gpanel { padding: 11px; }
-  .gs.draw .drawwrap { max-width: min(320px, 31vh); }
+  .gs.draw .drawpanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .gs.draw .drawwrap { flex: 1 1 auto; min-height: 110px; max-height: 340px;
+    width: auto; max-width: 100%; aspect-ratio: 1/1; margin: 0 auto; }
+  .gs.draw .drawtools { flex: none; }
 
   /* Buttons: one gradient pill per screen, ghosts for the rest. */
   .gbtn { flex: 1; appearance: none; border: none; cursor: pointer; display: flex;
-    align-items: center; justify-content: center; gap: 10px; padding: 17px;
-    border-radius: 999px; font-size: 18px; font-weight: 900; color: #fff;
+    align-items: center; justify-content: center; gap: 9px; padding: 14px;
+    border-radius: 999px; font-size: 16px; font-weight: 900; color: #fff;
     background: linear-gradient(100deg, var(--cyan), #6a5bff 55%, #c840ff);
     box-shadow: 0 10px 34px rgba(106,91,255,.42), 0 0 22px rgba(0,229,255,.22); }
-  .gbtn svg { width: 20px; height: 20px; flex: none; }
+  .gbtn svg { width: 18px; height: 18px; flex: none; }
   .gbtn:active { transform: translateY(2px); }
   .gbtn:disabled { opacity: .45; box-shadow: none; cursor: default; transform: none; }
   .gbtn.ghost { flex: none; padding: 17px 20px; font-size: 15px; box-shadow: none;
@@ -1200,6 +1207,11 @@ function syncHomeMark(){
   $("homeBtn").style.display = bare ? "none" : "";
   document.body.classList.toggle("chrome-bare", bare);
   document.body.classList.toggle("is-home", onHome);   // home-only background
+  document.body.classList.toggle("in-game", lv.contains("game"));
+  // the home screen must not show (or keep its video decoding) behind a game
+  const liveOpen = lv.contains("open");
+  const em = $("empty"); if (em) em.style.visibility = liveOpen ? "hidden" : "";
+  const hero = $("heroVideo"); if (hero) { if (liveOpen) hero.pause(); else playHero(); }
 }
 // Keep overlays clear of the app bar
 function syncHeaderHeight(){
@@ -1324,6 +1336,12 @@ function mountDeckPicker(host, opts, onPick) {
     list.hidden = !on;
     btn.setAttribute("aria-expanded", String(on));
     field.classList.toggle("open", on);
+    // clamp a floating list to the space left below the field, so it scrolls
+    // inside itself instead of running off the bottom of the phone
+    if (on && getComputedStyle(list).position === "absolute") {
+      const room = window.innerHeight - btn.getBoundingClientRect().bottom - 84;
+      list.style.maxHeight = Math.max(150, room) + "px";
+    }
     if (!on) return;
     list.innerHTML = opts.map(o =>
       `<button type="button" class="pickopt${o.v === value ? " on" : ""}" role="option"
@@ -1372,6 +1390,7 @@ function cardInner(c, i, total) {
 function playHero() {
   const v = $("heroVideo");
   if (!v) return;
+  if ($("liveView").classList.contains("open")) return;   // home is hidden
   const p = v.play();
   if (p && p.catch) p.catch(() => {});           // blocked (Low Power Mode) → poster stands in
 }
