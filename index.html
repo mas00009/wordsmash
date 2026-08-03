@@ -411,25 +411,14 @@
   .teamrow .minus { background: rgba(255,255,255,.12); }
   .teamrow .rm { color: var(--danger); font-size: 17px; padding: 4px; cursor: pointer; }
 
-  /* Installed fullscreen mode: iOS clips the page short of the screen by the
-     status-bar inset (59px on Dynamic Island phones) at the BOTTOM. Reserve
-     exactly that strip: buttons rise above the clip line, and each screen's
-     bottom fade completes right at it so the clipped remainder continues in
-     the same flat colour. Safari/desktop (no clip) are untouched. */
-  @media all and (display-mode: standalone) {
-    .live-inner { padding-bottom: max(calc(12px + var(--sab)), calc(26px + var(--sat)), 76px); }
-    .empty { padding-bottom: max(calc(12px + var(--sab)), calc(20px + var(--sat)), 64px); }
-    .joinbody { padding-bottom: calc(26% + 40px); }
-    .live-view.artbg::after {
-      background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - max(var(--sat), 64px) - 60px), #0b1019 calc(100% - max(var(--sat), 64px))),
-        linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.86) 22%, rgba(11,16,25,.45) 45%, rgba(11,16,25,0) 66%); }
-    .live-view.vid::after {
-      background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - max(var(--sat), 64px) - 60px), #0b1019 calc(100% - max(var(--sat), 64px))),
-        linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%, rgba(11,16,25,.62) 44%, rgba(11,16,25,.34) 100%); }
-    .homeveil {
-      background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
-        rgba(4,6,12,0) 50%, rgba(4,6,12,.8) calc(100% - max(var(--sat), 40px) - 30px), #04060c calc(100% - max(var(--sat), 40px))); }
-  }
+  /* Installed fullscreen mode: iOS lays the page out short of the screen by
+     the status-bar height. Painting below that line works (the art runs to the
+     true bottom edge — verified on-device), but touches down there are not
+     dependable — so every interactive footer keeps clear of the line. Keyed
+     off an html.pwa class set from JS because the display-mode media query
+     does not match on-device even when running installed. */
+  html.pwa .live-inner { padding-bottom: max(calc(12px + var(--sab)), calc(var(--sat) + 18px)); }
+  html.pwa .empty { padding-bottom: max(calc(12px + var(--sab)), calc(var(--sat) + 12px)); }
 
   /* time's-up flash */
   .flash { position: absolute; inset: 0; background: var(--danger); opacity: 0; pointer-events: none; z-index: 60; }
@@ -1129,6 +1118,11 @@
 <script src="./decks.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
+// installed-app detection that actually works on iOS (see html.pwa CSS)
+if ((navigator.standalone === true) ||
+    (window.matchMedia && matchMedia("(display-mode: standalone)").matches)) {
+  document.documentElement.classList.add("pwa");
+}
 // stamp the running build's version (from the service worker actually serving
 // this page) bottom-centre of home, so you always know what you're looking at
 fetch("./sw.js").then(r => r.text()).then(t => {
