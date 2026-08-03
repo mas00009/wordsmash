@@ -1750,7 +1750,19 @@ async function checkShareLink() {
 
 
 // ---------- PWA: service worker + install ----------
-if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+if ("serviceWorker" in navigator) window.addEventListener("load", () => {
+  // updateViaCache none: check for new versions straight past the CDN's
+  // 10-minute cache, or installed apps lag behind for no reason
+  navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).catch(() => {});
+  // the moment a newer build takes over, restart the shell so what you see is
+  // what just installed — but never yank the rug mid-game
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloaded) return;
+    reloaded = true;
+    if (!$("liveView").classList.contains("open")) location.reload();
+  });
+});
 const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredPrompt = e; showInstall("android"); });
