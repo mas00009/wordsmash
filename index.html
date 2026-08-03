@@ -535,7 +535,7 @@
   /* The first stop is the app bar's own #0b1019 so there's no colour step where
      the body meets the header; it fades to the artwork further down. */
   .live-view.artbg::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-    background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - 52px), #0b1019 100%), linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.86) 22%, rgba(11,16,25,.45) 45%, rgba(11,16,25,0) 66%); }
+    background: linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.86) 22%, rgba(11,16,25,.45) 45%, rgba(11,16,25,0) 66%); }
   .live-inner { position: relative; z-index: 2; }
   .joinbody { justify-content: center; padding-bottom: 32%; overflow: hidden; }
   .joincard { width: 100%; max-width: 330px; margin: 0 auto; display: flex; flex-direction: column;
@@ -678,8 +678,7 @@
      stay on the plain backdrop so the word is the loudest thing on screen. */
   .live-view.vid .joinbg { display: block; }
   .live-view.vid::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-    background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - 52px), #0b1019 100%),
-      linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%,
+    background: linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%,
       rgba(11,16,25,.62) 44%, rgba(11,16,25,.34) 100%); }
   .gs { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .gs-head { flex: none; text-align: center; margin-bottom: 12px; }
@@ -1127,15 +1126,7 @@ if ((navigator.standalone === true) ||
 // this page) bottom-centre of home, so you always know what you're looking at
 fetch("./sw.js").then(r => r.text()).then(t => {
   const m = t.match(/wordsmash-(v\d+)/);
-  if (m && $("verBadge")) {
-    const cs = getComputedStyle(document.documentElement);
-    const standalone = (navigator.standalone === true) ||
-      (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
-    const vv = window.visualViewport ? Math.round(visualViewport.height) : "-";
-    $("verBadge").textContent = m[1] + " · ih" + innerHeight + " sh" + screen.height
-      + " vv" + vv + " st" + cs.getPropertyValue("--sat").trim() + " sb" + cs.getPropertyValue("--sab").trim()
-      + (standalone ? " · app" : " · web");
-  }
+  if (m && $("verBadge")) $("verBadge").textContent = m[1];
 }).catch(() => {});
 const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
 const LS_KEY = "masgames_or_key", LS_MODEL = "masgames_or_model", LS_DECK = "masgames_deck", LS_GROUP = "masgames_group";
