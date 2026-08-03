@@ -442,6 +442,13 @@
       linear-gradient(180deg, rgba(11,16,25,.55) 0%, rgba(11,16,25,.96) 13%,
       rgba(11,16,25,.9) 27%, rgba(11,16,25,.62) 51%, rgba(11,16,25,.34) 100%); }
 
+  .rotate-shield { display: none; position: fixed; inset: 0; z-index: 400;
+    background: #0b1019; place-items: center; text-align: center; }
+  .rotate-shield b { display: block; font-size: 24px; font-weight: 900; color: #fff; }
+  .rotate-shield span { display: block; margin-top: 8px; font-size: 14px; color: var(--muted); }
+  @media (orientation: landscape) and (max-height: 520px) {
+    .rotate-shield { display: grid; } }
+
   /* time's-up flash */
   .flash { position: absolute; inset: 0; background: var(--danger); opacity: 0; pointer-events: none; z-index: 60; }
   .flash.go { animation: flashfx .55s ease 3; }
@@ -736,6 +743,17 @@
   .gpanel > h4 { margin: 0 0 12px; font-size: 10.5px; font-weight: 900; letter-spacing: .16em;
     text-transform: uppercase; color: #7f8db0; text-align: center; }
 
+  /* Whose turn, in one loud line under the score pills */
+  .rolebar { margin: 10px auto 0; width: fit-content; max-width: 100%;
+    padding: 9px 18px; border-radius: 999px; font-size: 14px; font-weight: 900;
+    letter-spacing: .02em; text-align: center; }
+  .rolebar.mine { background: linear-gradient(120deg, var(--t1), var(--t2)); color: #fff;
+    animation: rolepulse 1.6s ease-in-out infinite; }
+  .rolebar.theirs { border: 2px solid transparent; color: #c2cde6; opacity: .85;
+    background: linear-gradient(180deg, rgba(12,17,32,.9), rgba(8,11,24,.9)) padding-box,
+                linear-gradient(140deg, var(--t1), var(--t2)) border-box; }
+  @keyframes rolepulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+
   /* One bar says it all: the active team is the loud named pill with its board
      position; the other teams collapse to a coloured dot + position. The board
      on the TV carries the full scoreboard, so the phone stays quiet. */
@@ -1018,6 +1036,8 @@
 
 
   <div class="flash" id="flash"></div>
+  <div class="rotate-shield" aria-hidden="true"><div>
+    <b>Portrait, please</b><span>Turn your phone upright to play</span></div></div>
   <canvas class="fxcanvas" id="fxCanvas"></canvas>
   <div class="fxbanner" id="fxBanner"></div>
 
@@ -1158,6 +1178,7 @@ if ((navigator.standalone === true) ||
   const setVp = () => document.documentElement.style.setProperty("--vpH", window.innerHeight + "px");
   setVp();
   window.addEventListener("resize", setVp);
+  window.addEventListener("orientationchange", () => { setTimeout(setVp, 120); setTimeout(setVp, 500); });
 }
 // stamp the running build's version (from the service worker actually serving
 // this page) bottom-centre of home, so you always know what you're looking at

@@ -47,6 +47,7 @@
   }
   let timeUpKey = 0;   // so the time-up buzz fires once per turn
   let spinFxKey = "", stealFxKey = "", overFx = false;   // celebrate each event once
+  let spinRevealT = 0;                                   // build-up -> reveal timer
   const demoStore = { session: null, entries: {} };
 
   myName = localStorage.getItem("masgames_name") || "";
@@ -180,8 +181,21 @@
     myName = myName || "Player";
     liveCode = code; isHost = false; liveMode = "session"; lastV = 0; lastKey = "";
     try {
-      await api(`/api/session/${code}`, "GET");
+      const d = await api(`/api/session/${code}`, "GET");
       await writePlayer();
+      S = d;
+      const st0 = d.state || {};
+      if (st0.phase && st0.phase !== "lobby" && (st0.teams || []).length &&
+          !(st0.teams || []).some(t => (t.members || []).includes(userId))) {
+        await mutate(st => {
+          let sm = 0;
+          st.teams.forEach((t, i) => {
+            if ((t.members || []).length < (st.teams[sm].members || []).length) sm = i;
+          });
+          (st.teams[sm].members = st.teams[sm].members || []).push(userId);
+          return st;
+        });
+      }
       openLive(); startPoll();
     } catch (e) { showToast(e.status === 404 ? "Game not found. Check the code." : e.message, true); liveMode = "none"; liveCode = null; }
   }
@@ -319,21 +333,21 @@
       t.turnIdx = (t.turnIdx || 0) + 1;
       st.turnActive = false; st.timerEnds = 0; st.correct = 0;
       st.clearSeq = (st.clearSeq || 0) + 1;
+      // the word on screen when the turn ended is burned: whoever heard it
+      // described must never see it again
+      st.ptr = (st.ptr || 0) + 1;
 
       if (t.pos >= W.WIN_POS) {           // control turn for the win
         t.pos = W.WIN_POS;
         st.phase = "control"; st.control = { mode: "finish", team: i };
-        st.ptr = (st.ptr || 0) + 1;
         return st;
       }
       const ni = (i + 1) % n, nt = st.teams[ni];
       st.activeTeam = ni;
       if (nt.pos >= W.WIN_POS) {          // already on FINISH -> retry the control turn
         st.phase = "control"; st.control = { mode: "finish", team: ni };
-        st.ptr = (st.ptr || 0) + 1;
       } else if (W.isSpade(nt.pos)) {     // white spade -> all play
         st.phase = "control"; st.control = { mode: "spade", team: ni };
-        st.ptr = (st.ptr || 0) + 1;
       } else {
         st.cat = W.catAt(nt.pos);
       }
@@ -542,7 +556,7 @@
           <div class="w"><span class="spark">✦</span> You're up! <span class="spark">✦</span></div>
           <div class="v">${isDraw ? "You draw, they guess" : "You describe, they guess"}</div>
         </div>`;
-    } else if (st.turnActive && mine !== ti) {
+    } else if (st.turnActive && mine !== ti && mine !== -1) {
       // Other teams aren't guessing, so they get the answer too — half the fun
       // is knowing it while the guesses fly.
       main = `<div class="wordcard" style="${cvars}">
@@ -550,6 +564,12 @@
           <div class="w">${esc(currentWord())}</div>
           <div class="v">${esc(t.name)} are guessing. Keep it zipped</div>
         </div>` + (isDraw ? drawArea(false) : "");
+    } else if (mine === -1) {
+      main = `<div class="wordcard quiet" style="${cvars}">
+          <span class="cat">${esc(catName)}</span>
+          <div class="w">Not on a team</div>
+          <div class="v">Ask the host to add you</div>
+        </div>`;
     } else {
       const who = nameOf(describerId());
       main = `<div class="wordcard quiet" style="${cvars}">
@@ -562,6 +582,10 @@
     inner().innerHTML = `<div class="gs${isDraw ? " draw" : ""}">
       <div class="gs-head" style="margin-bottom:15px">
         <div class="teamsbar" id="liveScores">${scoreStrip()}</div>
+        <div class="rolebar ${mine === ti ? "mine" : "theirs"}" style="${teamVars(ti)}">${
+          amDescriber() ? (st.turnActive ? "Your turn · describe!" : "Your turn · you describe")
+          : mine === ti ? (st.turnActive ? "Your turn · shout answers!" : "Your team is up")
+          : esc(t.name) + (st.turnActive ? " are playing" : " are up next")}</div>
       </div>
       <div class="gs-body mid">
         ${ringHTML(st)}
@@ -698,13 +722,24 @@
       if (tl) tl.innerHTML = Array.from({ length: 6 },
         (_, i) => `<span class="pip ${i < Math.min(n, 6) ? "on" : ""}"></span>`).join("")
         + (n > 6 ? `<span class="pipmore">+${n - 6}</span>` : "");
-      if (st.spinResult && st.spinResult.places) {
+      if (st.spinResult) {
         const k = liveCode + "|" + (st.spinResult.id || st.spinResult.label);
         if (spinFxKey !== k) {
           spinFxKey = k;
-          FX.fireworks(2600);
-          FX.banner(st.spinResult.label.toUpperCase() + "!", "spinner bonus");
-          buzz([90, 60, 90, 60, 260]);
+          const places = st.spinResult.places | 0;
+          FX.banner("Spin space!", "the wheel is spinning…");
+          buzz([40, 50, 40, 50, 40]);
+          clearTimeout(spinRevealT);
+          spinRevealT = setTimeout(() => {
+            if (places > 0) {
+              FX.fireworks(2600);
+              FX.banner("+" + places + (places > 1 ? " PLACES!" : " PLACE!"), "spinner bonus");
+              buzz([90, 60, 90, 60, 260]);
+            } else {
+              FX.banner("No bonus", "the wheel says no");
+              buzz(60);
+            }
+          }, 2400);
         }
       }
       if (st.cat === "DRAW" && st.turnActive && !amDescriber()) redrawWatcher();
