@@ -223,6 +223,9 @@
     background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
       rgba(4,6,12,0) 52%, rgba(4,6,12,.72) 84%, rgba(4,6,12,.92) 100%); }
   .empty .tagblock, .empty .home-actions { position: relative; z-index: 2; }
+  .verbadge { position: absolute; left: 0; right: 0; bottom: calc(3px + var(--sab));
+    z-index: 2; text-align: center; font-size: 9px; font-weight: 700;
+    letter-spacing: .08em; color: rgba(255,255,255,.26); pointer-events: none; }
   /* strapline + its rule travel together as one block, so the even spacing
      applies between logo / strapline / buttons and not inside the pair */
   .tagblock { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 9px;
@@ -960,6 +963,7 @@
           <span class="hb-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 4 8 8-8 8"/></svg></span>
         </button>
       </div>
+      <div class="verbadge" id="verBadge"></div>
     </div>
 
     <div class="toast" id="toast" style="display:none;"></div>
@@ -1117,6 +1121,12 @@ function fitShell() {
   document.documentElement.style.setProperty("--shellH", h + "px");
 }
 fitShell();
+// stamp the running build's version (from the service worker actually serving
+// this page) bottom-centre of home, so you always know what you're looking at
+fetch("./sw.js").then(r => r.text()).then(t => {
+  const m = t.match(/wordsmash-(v\d+)/);
+  if (m && $("verBadge")) $("verBadge").textContent = m[1];
+}).catch(() => {});
 window.addEventListener("resize", fitShell);
 window.addEventListener("orientationchange", () => setTimeout(fitShell, 300));
 const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
