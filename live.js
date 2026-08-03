@@ -1,5 +1,5 @@
 // Word Smash — live multiplayer.
-// Flow: host picks a deck -> lobby (code + QR) -> host sets teams -> play.
+// Flow: host picks a deck -> lobby (room code) -> host sets teams -> play.
 // A turn: the board space under your team gives the category; the describer
 // gets words of that category (or DRAWS them) against the clock; every correct
 // answer is one space forward. First team to the end wins.
@@ -417,20 +417,17 @@
   // ---------- lobby (live only — solo has nothing to share) ----------
   function buildLobby() {
     title(""); tint();
-    const link = location.origin + location.pathname + "?join=" + liveCode;
     const boardLink = location.origin + location.pathname.replace(/[^/]*$/, "board.html") + "?code=" + liveCode + "&api=" + encodeURIComponent(API_BASE);
-    const qr = makeQR(link);
     const cells = String(liveCode || "").slice(0, 4).padEnd(4, " ").split("")
       .map(c => `<span>${esc(c.trim())}</span>`).join("");
     inner().innerHTML = `<div class="gs">
       ${head("Game lobby", isHost ? "Share this code, then set up the teams" : "You're in, waiting for the host")}
       <div class="gs-body">
         <div class="roomcode">${cells}</div>
-        ${qr ? `<div class="qrbox"><img src="${qr}" alt="Join QR code"/></div>` : ""}
         <div class="gpanel"><h4>In the room</h4><div class="whos" id="livePlayers"></div></div>
         <div class="gpanel"><h4>Your name</h4>
           <input class="tname" id="myNameInp" value="${esc(myName)}" style="width:100%" /></div>
-        ${isHost ? `<button class="gbtn ghost" id="boardBtn" style="width:100%">${svg(ICON.tv, 1.9)} Open the board view</button>` : ""}
+        ${isHost ? `<button class="gbtn ghost" id="boardBtn" style="width:100%">${svg(ICON.tv, 1.9)} Copy the board link</button>` : ""}
       </div>
       <div class="gs-foot">${isHost
         ? `<button class="gbtn" id="toTeams">Set up teams ${svg(ICON.arrow)}</button>`
@@ -441,7 +438,17 @@
     nm.onchange = async () => { myName = nm.value.trim() || "Player"; localStorage.setItem("masgames_name", myName); await writePlayer(); };
     if (isHost) {
       $("toTeams").onclick = gotoTeams;
-      $("boardBtn").onclick = () => window.open(boardLink, "_blank");
+      // the board belongs on a TV or laptop — opening it here would take over
+      // the app (an installed app has no tabs), so the link is copied instead
+      $("boardBtn").onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(boardLink);
+          showToast("Board link copied. Open it on a TV or laptop");
+        } catch {
+          window.prompt("Copy this link for the TV:", boardLink);
+        }
+        setTimeout(hideToast, 2800);
+      };
     }
   }
 

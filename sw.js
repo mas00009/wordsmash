@@ -1,6 +1,6 @@
 // MasGames service worker — caches the app shell so it opens instantly / offline.
 // Bump CACHE when you change the app shell so clients pick up the new version.
-const CACHE = "wordsmash-v166";
+const CACHE = "wordsmash-v167";
 // Only what the app actually loads. logo.svg, logo-trans.png, logo-mas-trans.png
 // and logo-tagline-trans.png were still listed here but referenced nowhere —
 // 4.6 MB of dead weight downloaded onto every phone on install.
