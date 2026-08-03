@@ -465,7 +465,10 @@
     text-shadow: 0 0 24px rgba(0,229,255,.75), 0 0 60px rgba(138,43,226,.65), 0 6px 30px rgba(0,0,0,.8); }
   .fxbanner small { display: block; margin-top: 8px; font-size: 13px; letter-spacing: .22em;
     text-transform: uppercase; color: #c2cde6; text-shadow: 0 2px 14px rgba(0,0,0,.8); }
-  .fxbanner.go { animation: fxpop 2s cubic-bezier(.2,1.4,.4,1) both; }
+  .fxbanner.go { animation: fxpop var(--bd, 2s) cubic-bezier(.2,1.4,.4,1) both; }
+  .fxbanner.out { opacity: 0; transition: opacity .25s; }
+  #ring, .tally { transition: opacity .25s; }
+  body.fxb #ring, body.fxb .tally { opacity: .05; }
   @keyframes fxpop {
     0% { opacity: 0; transform: translate(-50%,-50%) scale(.4); }
     12% { opacity: 1; transform: translate(-50%,-50%) scale(1.08); }
@@ -743,16 +746,24 @@
   .gpanel > h4 { margin: 0 0 12px; font-size: 10.5px; font-weight: 900; letter-spacing: .16em;
     text-transform: uppercase; color: #7f8db0; text-align: center; }
 
-  /* Whose turn, in one loud line under the score pills */
-  .rolebar { margin: 10px auto 0; width: fit-content; max-width: 100%;
-    padding: 9px 18px; border-radius: 999px; font-size: 14px; font-weight: 900;
-    letter-spacing: .02em; text-align: center; }
-  .rolebar.mine { background: linear-gradient(120deg, var(--t1), var(--t2)); color: #fff;
+  /* Whose turn — ONE pill: dot, role, board position. Full scores live on
+     the TV board and the winners page; four pills of numbers were noise. */
+  .upbar { margin: 0 auto; width: fit-content; max-width: 100%; display: flex;
+    align-items: center; gap: 9px; padding: 10px 17px; border-radius: 999px;
+    font-size: 14.5px; font-weight: 900; letter-spacing: .02em; }
+  .upbar i { width: 11px; height: 11px; border-radius: 50%; flex: none;
+    background: linear-gradient(160deg, var(--t1), var(--t2)); }
+  .upbar b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upbar small { font-size: 11.5px; font-weight: 800; letter-spacing: .06em; flex: none; }
+  .upbar.mine { background: linear-gradient(120deg, var(--t1), var(--t2)); color: #fff;
     animation: rolepulse 1.6s ease-in-out infinite; }
-  .rolebar.theirs { border: 2px solid transparent; color: #c2cde6; opacity: .85;
+  .upbar.mine i { background: #fff; box-shadow: 0 0 8px rgba(255,255,255,.8); }
+  .upbar.mine small { color: rgba(255,255,255,.75); }
+  .upbar.theirs { border: 2px solid transparent; color: #c2cde6; opacity: .9;
     background: linear-gradient(180deg, rgba(12,17,32,.9), rgba(8,11,24,.9)) padding-box,
                 linear-gradient(140deg, var(--t1), var(--t2)) border-box; }
-  @keyframes rolepulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+  .upbar.theirs small { color: #8b99b8; }
+  @keyframes rolepulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
 
   /* One bar says it all: the active team is the loud named pill with its board
      position; the other teams collapse to a coloured dot + position. The board
@@ -1007,16 +1018,7 @@
           <span class="hb-txt"><b>Join a game</b></span>
           <span class="hb-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 4 8 8-8 8"/></svg></span>
         </button>
-        <button class="btn homebtn" id="emptySolo">
-          <span class="hb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="8.6" cy="7.6" r="3.1"/>
-            <path d="M2.9 19.4a5.7 5.7 0 0 1 11.4 0"/>
-            <path d="M16.9 4.6h4.4v4.4"/><path d="m21.3 4.6-4.9 4.9"/>
-            <circle cx="18.1" cy="16.4" r="2.4"/>
-          </svg></span>
-          <span class="hb-txt"><b>Solo game</b></span>
-          <span class="hb-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 4 8 8-8 8"/></svg></span>
-        </button>
+        
       </div>
       <div class="verbadge" id="verBadge"></div>
     </div>
@@ -1546,11 +1548,13 @@ const FX = (() => {
     return d;
   }
   function spawn(x, y, n, power) {
+    const hue = COLORS[Math.random() * COLORS.length | 0];
     for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, v = (0.35 + Math.random() * 0.65) * power;
-      parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - power * 0.25,
-        r: 1.6 + Math.random() * 2.4, c: COLORS[Math.random() * COLORS.length | 0],
-        life: 1, decay: 0.012 + Math.random() * 0.014 });
+      const a = Math.random() * Math.PI * 2, v = (0.25 + Math.random() * 0.75) * power;
+      parts.push({ x, y, px: x, py: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - power * 0.22,
+        r: 1.4 + Math.random() * 2.2,
+        c: Math.random() < 0.55 ? hue : COLORS[Math.random() * COLORS.length | 0],
+        life: 1, decay: 0.010 + Math.random() * 0.012 });
     }
   }
   function tick() {
@@ -1559,20 +1563,28 @@ const FX = (() => {
     ctx.clearRect(0, 0, W, H);
     const now = performance.now();
     if (now < until && now > shellT) {           // next firework shell
-      shellT = now + 260 + Math.random() * 300;
-      spawn(W * (0.18 + Math.random() * 0.64), H * (0.12 + Math.random() * 0.42),
-            34 + Math.random() * 22 | 0, 7 + Math.random() * 3);
+      shellT = now + 300 + Math.random() * 340;
+      if (parts.length < 420)
+        spawn(W * (0.18 + Math.random() * 0.64), H * (0.16 + Math.random() * 0.42),
+              55 + Math.random() * 25 | 0, 7.5 + Math.random() * 3);
     }
     parts = parts.filter(p => p.life > 0);
+    ctx.globalCompositeOperation = "lighter";     // additive: sparks glow
+    ctx.lineCap = "round";
     for (const p of parts) {
-      p.x += p.vx; p.y += p.vy; p.vy += 0.11; p.vx *= 0.985; p.vy *= 0.985;
+      p.px = p.x; p.py = p.y;
+      p.x += p.vx; p.y += p.vy; p.vy += 0.10; p.vx *= 0.986; p.vy *= 0.986;
       p.life -= p.decay;                          // may cross 0 here, so clamp
       const a = Math.max(0, p.life);
-      ctx.globalAlpha = a;
-      ctx.fillStyle = p.c;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * a, 0, 7); ctx.fill();
+      ctx.globalAlpha = a * 0.9;
+      ctx.strokeStyle = p.c; ctx.lineWidth = p.r * a * 2;
+      ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x, p.y); ctx.stroke();
+      ctx.globalAlpha = a * 0.55;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * a * 0.6, 0, 7); ctx.fill();
     }
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
     if (parts.length || now < until) raf = requestAnimationFrame(tick);
     else { raf = 0; cv.classList.remove("on"); }
   }
@@ -1582,10 +1594,19 @@ const FX = (() => {
       const d = fit(); spawn(cv.width / d * fx, cv.height / d * fy, n, power); go();
     },
     fireworks(ms = 2600) { until = performance.now() + ms; shellT = 0; go(); },
-    banner(text, sub) {
+    banner(text, sub, ms) {
       const b = $("fxBanner");
       b.innerHTML = esc(text) + (sub ? `<small>${esc(sub)}</small>` : "");
-      b.classList.remove("go"); void b.offsetWidth; b.classList.add("go");
+      b.style.setProperty("--bd", (ms || 2000) + "ms");
+      b.classList.remove("go", "out"); void b.offsetWidth; b.classList.add("go");
+      document.body.classList.add("fxb");
+      clearTimeout(this._bt);
+      this._bt = setTimeout(() => document.body.classList.remove("fxb"), (ms || 2000) - 150);
+    },
+    soften() {                       // screen changed under a banner: fade it fast
+      const b = $("fxBanner");
+      if (b.classList.contains("go")) { b.classList.remove("go"); b.classList.add("out"); }
+      document.body.classList.remove("fxb");
     },
   };
 })();

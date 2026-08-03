@@ -381,7 +381,11 @@
     if (liveMode !== "session" || !S) return;
     const st = S.state;
     const key = [st.phase, (st.control && st.control.mode) || "", activeTeamIdx(), st.turnActive, amDescriber(), st.cat, st.ptr, st.clearSeq, teams().length, st.teams.map(t => (t.members || []).length).join(",")].join("|");
-    if (key !== lastKey) { build(); lastKey = key; }
+    if (key !== lastKey) {
+      // a banner mid-pop straddling a screen change reads as a glitch
+      if (lastKey && lastKey.split("|")[0] !== st.phase && window.FX && FX.soften) FX.soften();
+      build(); lastKey = key;
+    }
     updateDynamic();
   }
 
@@ -581,11 +585,13 @@
 
     inner().innerHTML = `<div class="gs${isDraw ? " draw" : ""}">
       <div class="gs-head" style="margin-bottom:15px">
-        <div class="teamsbar" id="liveScores">${scoreStrip()}</div>
-        <div class="rolebar ${mine === ti ? "mine" : "theirs"}" style="${teamVars(ti)}">${
-          amDescriber() ? (st.turnActive ? "Your turn · describe!" : "Your turn · you describe")
-          : mine === ti ? (st.turnActive ? "Your turn · shout answers!" : "Your team is up")
-          : esc(t.name) + (st.turnActive ? " are playing" : " are up next")}</div>
+        <div class="upbar ${mine === ti ? "mine" : "theirs"}" style="${teamVars(ti)}">
+          <i></i><b>${
+            amDescriber() ? (st.turnActive ? "Your turn · describe!" : "Your turn · you describe")
+            : mine === ti ? (st.turnActive ? "Your turn · shout answers!" : "Your team is up")
+            : esc(t.name) + (st.turnActive ? " are playing" : " are up next")
+          }</b><small>${(t.pos | 0) + 1} / ${M().WIN_POS}</small>
+        </div>
       </div>
       <div class="gs-body mid">
         ${ringHTML(st)}
@@ -727,7 +733,7 @@
         if (spinFxKey !== k) {
           spinFxKey = k;
           const places = st.spinResult.places | 0;
-          FX.banner("Spin space!", "the wheel is spinning…");
+          FX.banner("Spin space!", "the wheel is spinning…", 2500);
           buzz([40, 50, 40, 50, 40]);
           clearTimeout(spinRevealT);
           spinRevealT = setTimeout(() => {
