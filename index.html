@@ -427,6 +427,19 @@
      does not match on-device even when running installed. */
   html.pwa .live-inner { padding-bottom: max(calc(12px + var(--sab)), calc(var(--sat) + 18px)); }
   html.pwa .empty { padding-bottom: max(calc(12px + var(--sab)), calc(var(--sat) + 12px)); }
+  html.pwa .homeveil { height: var(--vpH, 100lvh);
+    background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
+      rgba(4,6,12,0) 50%, rgba(4,6,12,.85) calc(100% - 44px), #04060c 100%); }
+  html.pwa .live-view.artbg::after, html.pwa .live-view.vid::after {
+    height: var(--vpH, 100lvh); }
+  html.pwa .live-view.artbg::after {
+    background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - 90px), #0b1019 100%),
+      linear-gradient(180deg, rgba(11,16,25,.55) 0%, rgba(11,16,25,.96) 13%,
+      rgba(11,16,25,.86) 31%, rgba(11,16,25,.45) 52%, rgba(11,16,25,0) 70%); }
+  html.pwa .live-view.vid::after {
+    background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - 90px), #0b1019 100%),
+      linear-gradient(180deg, rgba(11,16,25,.55) 0%, rgba(11,16,25,.96) 13%,
+      rgba(11,16,25,.9) 27%, rgba(11,16,25,.62) 51%, rgba(11,16,25,.34) 100%); }
 
   /* time's-up flash */
   .flash { position: absolute; inset: 0; background: var(--danger); opacity: 0; pointer-events: none; z-index: 60; }
@@ -1137,6 +1150,12 @@ const $ = (id) => document.getElementById(id);
 if ((navigator.standalone === true) ||
     (window.matchMedia && matchMedia("(display-mode: standalone)").matches)) {
   document.documentElement.classList.add("pwa");
+  // installed iOS refuses to paint below the layout viewport (proven with
+  // anchor bars on-device): innerHeight IS the clip line. Hand it to CSS so
+  // the bottom fades complete exactly there.
+  const setVp = () => document.documentElement.style.setProperty("--vpH", window.innerHeight + "px");
+  setVp();
+  window.addEventListener("resize", setVp);
 }
 // stamp the running build's version (from the service worker actually serving
 // this page) bottom-centre of home, so you always know what you're looking at
