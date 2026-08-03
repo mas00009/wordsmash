@@ -8,7 +8,7 @@
 
 <!-- PWA / installable app -->
 <link rel="manifest" href="./manifest.webmanifest" />
-<meta name="theme-color" content="#0B0F17" />
+<meta name="theme-color" content="#0d0a1c" />
 <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
 <link rel="icon" type="image/png" href="./icon-192.png" />
 <meta name="mobile-web-app-capable" content="yes" />
@@ -201,8 +201,8 @@
      beneath the badge with the buttons floating in the lower half — the same
      logo → strapline → buttons cadence the old three-block layout had. */
   .empty { position: relative; flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: space-evenly; gap: 0;
-    text-align: center; padding: 28vh 18px calc(12px + var(--sab)); color: var(--muted); min-height: 0;
+    align-items: center; justify-content: flex-start; gap: 0;
+    text-align: center; padding: 36vh 18px calc(12px + var(--sab)); color: var(--muted); min-height: 0;
     background: #04060c; }
   /* Pinned to the physical screen (largest viewport), not the layout box —
      flex rounding and browser chrome left slivers below a box-anchored video.
@@ -218,9 +218,8 @@
   .empty .tagblock, .empty .home-actions { position: relative; z-index: 2; }
   /* strapline + its rule travel together as one block, so the even spacing
      applies between logo / strapline / buttons and not inside the pair */
-  /* nudged down so it sits midway between the badge and the buttons */
   .tagblock { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 9px;
-    margin-top: 7vh; }
+    margin-bottom: 26px; }
   .tagline { flex: 0 0 auto; margin: 0; font-size: 15px; font-weight: 800; line-height: 1.4;
     color: #dbe4f5; text-transform: uppercase; letter-spacing: .09em; }
   /* hairline · diamond · hairline under the tagline */
