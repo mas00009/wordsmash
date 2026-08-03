@@ -37,9 +37,13 @@
     --sab: env(safe-area-inset-bottom, 0px);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html { margin: 0; padding: 0; height: 100%; overscroll-behavior: none; }
-  body { margin: 0; padding: 0; position: fixed; inset: 0; overflow: hidden;
-    overscroll-behavior: none; }
+  /* The root canvas paints any strip the browser reserves (home indicator,
+     collapsed toolbars) — end it in the same purple-black as the artwork so
+     no hard edge can ever show below the app. */
+  html { margin: 0; padding: 0; height: 100%; overscroll-behavior: none;
+    background: linear-gradient(180deg, #0b1019 0%, #0b0c1a 70%, #0d0a1c 100%); }
+  body { margin: 0; padding: 0; position: fixed; top: 0; left: 0; right: 0;
+    height: 100%; height: 100lvh; overflow: hidden; overscroll-behavior: none; }
   body {
     font-family: ui-rounded, "SF Pro Rounded", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
@@ -200,14 +204,15 @@
     align-items: center; justify-content: space-evenly; gap: 0;
     text-align: center; padding: 28vh 18px calc(12px + var(--sab)); color: var(--muted); min-height: 0;
     background: #04060c; }
-  /* Runs the full app height — up behind the (transparent) bar and settings
-     icon. The bar sits at z 80, so it stays tappable over the artwork. */
-  .homebg { position: absolute; left: 0; right: 0; bottom: 0;
-    top: calc(-1 * var(--headerH, 74px)); width: 100%; height: auto;
+  /* Pinned to the physical screen (largest viewport), not the layout box —
+     flex rounding and browser chrome left slivers below a box-anchored video.
+     Runs up behind the transparent bar; the bar sits at z 80, still tappable. */
+  .homebg { position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+    width: min(100vw, 480px); height: 100%; height: 100lvh;
     object-fit: cover; object-position: center top; z-index: 0; }
   /* dark ramp at the bottom so the buttons sit on something quiet */
-  .homeveil { position: absolute; left: 0; right: 0; bottom: 0;
-    top: calc(-1 * var(--headerH, 74px)); z-index: 1; pointer-events: none;
+  .homeveil { position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+    width: min(100vw, 480px); height: 100%; height: 100lvh; z-index: 1; pointer-events: none;
     background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
       rgba(4,6,12,0) 52%, rgba(4,6,12,.72) 84%, rgba(4,6,12,.92) 100%); }
   .empty .tagblock, .empty .home-actions { position: relative; z-index: 2; }
