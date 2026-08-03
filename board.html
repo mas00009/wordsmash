@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Word Smash Board</title>
+<style>
+  :root{
+    --bg:#0B0F17; --panel:#121826; --panel2:#1a2233; --ink:#fff; --muted:#93a1c0;
+    --line:rgba(255,255,255,.14); --cyan:#00E5FF; --violet:#8A2BE2; --gold:#FFD100;
+  }
+  *{box-sizing:border-box;margin:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(900px 500px at 85% -10%, rgba(0,229,255,.16), transparent 55%),
+      radial-gradient(800px 500px at 15% 110%, rgba(138,43,226,.30), transparent 58%),
+      var(--bg);
+    color:var(--ink); font-family:ui-rounded,"SF Pro Rounded",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  header{display:flex;align-items:center;justify-content:flex-end;padding:10px 26px 8px;flex:0 0 auto;}
+  .code{margin-left:auto;text-align:right;}
+  .code .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:800;}
+  .code .val{font-size:34px;font-weight:900;letter-spacing:8px;
+    background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  /* borderless +, sitting on the code's baseline */
+  .coderow{display:flex;align-items:flex-end;gap:9px;justify-content:flex-end;}
+  .addcode{flex:none;cursor:pointer;background:none;border:none;padding:0 2px;
+    color:var(--cyan);font-size:30px;font-weight:900;line-height:1;
+    transform:translateY(-3px);opacity:.85;}
+  .addcode:hover{opacity:1;}
+  .addcode:active{transform:translateY(-3px) scale(.9);}
+  #codeIn{width:170px;background:transparent;border:none;border-bottom:2px solid var(--cyan);
+    color:var(--cyan);font:inherit;font-size:34px;font-weight:900;letter-spacing:8px;
+    text-align:right;text-transform:uppercase;outline:none;}
+  .divider{height:2px;margin:0 26px;border-radius:2px;flex:0 0 auto;
+    background:linear-gradient(90deg,transparent,var(--cyan) 25%,var(--violet) 75%,transparent);box-shadow:0 0 14px rgba(0,229,255,.4);}
+
+  main{flex:1;min-height:0;padding:4px 20px 8px;display:flex;}
+  .stage{position:relative;flex:1;min-height:0;display:grid;padding:0;}
+  .hud{position:absolute;top:0;z-index:2;pointer-events:none;}
+  .hud-tl{left:0;max-width:34%;}
+  .hud-tr{right:0;text-align:right;}
+  .hud-lbl{font-size:14px;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);font-weight:800;margin-bottom:6px;}
+  /* stacked in the bottom-left corner, which a circle can never occupy */
+  .teamstrip{position:absolute;bottom:0;left:0;z-index:2;display:flex;flex-direction:column;
+    gap:8px;align-items:stretch;width:min(340px,26vw);pointer-events:none;}
+
+  /* board track */
+  .board{width:100%;height:100%;display:flex;align-items:center;justify-content:center;min-height:0;}
+  .bsvg{width:100%;height:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 10px 40px rgba(0,0,0,.5));}
+  .brow{display:grid;grid-template-columns:repeat(10,1fr);gap:10px;}
+  .sp{position:relative;border-radius:12px;padding:8px 4px 10px;text-align:center;border:2px solid rgba(255,255,255,.22);
+    background:linear-gradient(160deg,var(--c1),var(--c2));min-height:74px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;}
+  .sp .n{font-size:10px;font-weight:800;opacity:.75;}
+  .sp .t{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;line-height:1.1;margin-top:2px;text-shadow:0 1px 4px rgba(0,0,0,.4);}
+  .sp.wild{box-shadow:0 0 16px rgba(0,255,198,.5);}
+  .sp.finish{background:linear-gradient(160deg,#fff,#cfe9ff);}
+  .sp.finish .t,.sp.finish .n{color:#0B0F17;text-shadow:none;}
+  .toks{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-top:auto;}
+  .tok{width:20px;height:20px;border-radius:50%;border:2px solid #fff;font-size:10px;font-weight:900;display:grid;place-items:center;color:#08111c;
+    background:linear-gradient(160deg,var(--t1),var(--t2));box-shadow:0 2px 8px rgba(0,0,0,.45);}
+  .sp.cur{outline:3px solid #fff;outline-offset:2px;}
+
+  /* side panel */
+  .turnbig{font-size:58px;font-weight:900;line-height:1;letter-spacing:-.5px;}
+  @keyframes fwburst{
+    0%{opacity:0;transform:scale(.15)}
+    18%{opacity:1;transform:scale(.75)}
+    100%{opacity:0;transform:scale(1.35)}
+  }
+  #fireworks.go .fw{animation:fwburst 1.25s ease-out 3 both;}
+  @keyframes winflash{
+    0%{opacity:0}   12%{opacity:1}  24%{opacity:.15} 36%{opacity:1}
+    48%{opacity:.2} 60%{opacity:1}  74%{opacity:.35} 100%{opacity:1}
+  }
+  #winFlash.winflash{animation:winflash 1.5s ease-out forwards;}
+  .spinpill{margin-top:10px;border-radius:12px;padding:10px 12px;text-align:center;font-weight:900;font-size:19px;
+    background:#12251c;border:2px solid #43e97b;color:#43e97b;display:none;}
+  .spinpill.mint{background:#0f2a26;border-color:#00FFC6;color:#00FFC6;}
+  .catbig{display:inline-block;margin-top:12px;border-radius:14px;padding:11px 20px;font-weight:900;font-size:28px;white-space:nowrap;
+    background:linear-gradient(160deg,var(--c1,#00E5FF),var(--c2,#8A2BE2));border:2px solid rgba(255,255,255,.3);}
+  .catbig.hint{background:none;border:none;padding:0;color:var(--muted);font-size:15px;font-weight:700;}
+  .clock{font-size:124px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums;line-height:1;}
+  .clock.warn{color:var(--gold);} .clock.done{color:#ff5470;}
+  /* Neon outline pill that replaces nothing — it appears under the 0:00 when
+     the turn's clock runs out, so the TV says it as well as buzzing. */
+  /* text-align is explicit: .hud-tr sets right-align for the clock, and the
+     pill is a block that stretches to the clock's width, so without this the
+     wording sat hard against the pill's right edge. text-indent puts back the
+     trailing letter-space that centring would otherwise nudge left. */
+  .timeup{display:none;margin-top:14px;white-space:nowrap;text-align:center;text-indent:.04em;
+    border:2px solid #ff2d55;border-radius:999px;padding:10px 22px;
+    color:#ff2d55;font-size:26px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;
+    text-shadow:0 0 14px rgba(255,45,85,.85);box-shadow:0 0 18px rgba(255,45,85,.45),inset 0 0 18px rgba(255,45,85,.22);
+    animation:tuPulse 1s ease-in-out infinite;}
+  .timeup.show{display:block;}
+  @keyframes tuPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.62;transform:scale(.975);}}
+  .trow{display:flex;align-items:center;gap:10px;background:rgba(18,24,38,.85);
+    border:2px solid var(--line);border-radius:999px;padding:9px 17px;font-size:17px;}
+  /* white glow = whose turn it is; 👑 = current leader. They can apply together. */
+  .trow.active{border-color:#fff;box-shadow:0 0 16px rgba(255,255,255,.3);}
+  .trow .crown{flex:none;width:22px;text-align:center;font-size:15px;line-height:1;}
+  .swatch{width:22px;height:22px;border-radius:50%;flex:none;border:2px solid #fff;background:linear-gradient(160deg,var(--t1),var(--t2));}
+  .trow .nm{flex:1;min-width:0;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .trow .ps{flex:none;min-width:2.4ch;text-align:right;font-variant-numeric:tabular-nums;font-weight:900;font-size:21px;font-variant-numeric:tabular-nums;}
+  /* Board slice labels: identical everywhere so no label reads heavier than
+     another. White fill over a dark outline works on every slice colour. */
+  .slab{fill:#fff;stroke:rgba(4,6,10,.72);stroke-width:3.2px;stroke-linejoin:round;paint-order:stroke fill;}
+  .slab.spade{fill:#0B0F17;stroke:none;}   /* the ♠ stays solid black on white */
+  .msg{text-align:center;color:var(--muted);font-weight:700;padding:28px 10px;line-height:1.6;}
+  .big{font-size:44px;font-weight:900;text-align:center;line-height:1.15;}
+  .sub{text-align:center;color:var(--muted);font-weight:700;margin-top:6px;}
+</style>
+</head>
+<body>
+  <!-- Deliberately minimal: the logo already sits in the middle of the wheel,
+       so the header is just the room code. -->
+  <header>
+    <div class="code">
+      <div class="lbl">Room</div>
+      <div class="coderow">
+        <div class="val" id="code">----</div>
+        <button class="addcode" id="soundBtn" title="Enable sound" aria-label="Enable sound" style="display:none">🔇</button>
+        <button class="addcode" id="addCode" title="Enter room code" aria-label="Enter room code">+</button>
+      </div>
+    </div>
+  </header>
+  <div class="divider"></div>
+
+  <main>
+    <!-- The wheel is a circle, so its corners are dead space: the readouts live
+         there instead of in a side rail. -->
+    <div class="stage">
+      <div class="board" id="board"></div>
+
+      <div class="hud hud-tl" id="hudTL">
+        <div class="hud-lbl">Now playing</div>
+        <div class="turnbig" id="turnName">…</div>
+        <div class="catbig hint" id="catBig"></div>
+        <div class="spinpill" id="spinPill"></div>
+      </div>
+
+      <div class="hud hud-tr" id="hudTR">
+        <div class="hud-lbl">Time</div>
+        <div class="clock" id="clock">0:00</div>
+        <div class="timeup" id="timeUp">⏰ Time's up!</div>
+      </div>
+
+      <div class="teamstrip" id="teams"></div>
+    </div>
+  </main>
+
+<script src="./wordsmash.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const M = window.WORDSMASH;
+const qs = new URLSearchParams(location.search);
+const CODE = (qs.get("code") || qs.get("board") || "").toUpperCase();
+// Board view is read-only: it just polls the same session the phones use.
+const API_BASE = qs.get("api") || localStorage.getItem("masgames_api") || "https://REPLACE-ME.workers.dev";
+const cloudOn = () => /^https?:\/\//.test(API_BASE) && !/REPLACE-ME/.test(API_BASE);
+let S = null, lastV = 0;
+
+$("code").textContent = CODE || "----";
+// remember the Worker URL so a code typed in later still knows where to look
+if (qs.get("api")) localStorage.setItem("masgames_api", qs.get("api"));
+
+// The + turns the code into an input; Enter loads that room, Esc cancels.
+function askForCode() {
+  const val = $("code"), prev = CODE || "----";
+  val.innerHTML = `<input id="codeIn" maxlength="6" placeholder="CODE" autocomplete="off" value="${CODE || ""}">`;
+  const inp = document.getElementById("codeIn");
+  inp.focus(); inp.select();
+  const cancel = () => { val.textContent = prev; };
+  inp.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      const c = (inp.value || "").trim().toUpperCase();
+      if (!c) return cancel();
+      const p = new URLSearchParams(location.search);
+      p.set("code", c);
+      const api = qs.get("api") || localStorage.getItem("masgames_api");
+      if (api) p.set("api", api);
+      location.search = p.toString();
+    } else if (e.key === "Escape") cancel();
+  });
+  inp.addEventListener("blur", cancel);
+}
+$("addCode").addEventListener("click", askForCode);
+$("soundBtn").addEventListener("click", audioReady);
+audioReady();   // reveals the unmute button if the browser is blocking us
+
+// --- time's-up buzzer -------------------------------------------------------
+// Browsers block audio until the page has been interacted with, so we create the
+// context lazily, retry on any click/key, and surface a small unmute button only
+// while it's actually blocked.
+let audioCtx = null;
+function audioReady() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) { return false; }
+  const ok = audioCtx && audioCtx.state === "running";
+  const btn = document.getElementById("soundBtn");
+  if (btn) btn.style.display = ok ? "none" : "";
+  return ok;
+}
+function playBuzzer() {
+  if (!audioReady()) return;                 // stays silent rather than throwing
+  const now = audioCtx.currentTime;
+  [0, 0.30, 0.60].forEach((t, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = "square";
+    o.frequency.value = i === 2 ? 590 : 850;  // last blast drops a bit
+    o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.0001, now + t);
+    g.gain.exponentialRampToValueAtTime(0.32, now + t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + t + (i === 2 ? 0.5 : 0.26));
+    o.start(now + t); o.stop(now + t + (i === 2 ? 0.55 : 0.3));
+  });
+}
+["click", "keydown", "touchstart"].forEach(ev =>
+  document.addEventListener(ev, audioReady, { passive: true }));
+
+function esc(s){ return String(s).replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+function fmt(s){ s = Math.max(0, s|0); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
+
+// The real Articulate board is a hexagon of radial spokes around a centre
+// spinner, so we draw it as SVG: 48 wedges whose outer edge follows a hexagon.
+// The viewBox is wider than the ring of slices to leave a margin for the neon
+// bezel. Growing the box rather than shrinking R_OUT means the slices only lose
+// ~4% on screen instead of the ~10% a smaller wheel would have cost.
+const VB = 1040, CX = VB/2, CY = VB/2, R_OUT = 452, R_IN = 112;
+// Bezel sits right against the wheel — just enough clearance for its inner neon
+// rim to read as a separate line rather than merging with the slice outlines.
+const R_BEZ0 = R_OUT + 6, R_BEZ1 = R_OUT + 32;
+// The team marker is set INTO the bezel: that arc of the ring lights up in the
+// team's colour instead of the marker floating in a gap of its own.
+const R_MARK0 = R_BEZ0 + 6, R_MARK1 = R_BEZ1 - 6;
+const LAMP_R = 8;   // outer radius of a bezel lamp's glow
+// Width of the START / FINISH rim labels, and of the chequered flag above
+// FINISH — both use it so the flag and the word line up as one block.
+const RIM_W = 47;
+const pt = (ang, rad) => {
+  const t = (ang - 90) * Math.PI / 180;
+  return [CX + Math.cos(t) * rad, CY + Math.sin(t) * rad];
+};
+
+// One ring segment: straight spokes with an arc across the outer edge.
+function wedgePath(a0, a1) {
+  const o0 = pt(a0, R_OUT), o1 = pt(a1, R_OUT);
+  const i0 = pt(a0, R_IN),  i1 = pt(a1, R_IN);
+  return `M ${i0[0]} ${i0[1]} L ${o0[0]} ${o0[1]} ` +
+         `A ${R_OUT} ${R_OUT} 0 0 1 ${o1[0]} ${o1[1]} ` +
+         `L ${i1[0]} ${i1[1]} Z`;
+}
+
+// A single arc stroke along a radius.
+const arcD = (a0, a1, r) => {
+  const [x0, y0] = pt(a0, r), [x1, y1] = pt(a1, r);
+  return `M ${x0} ${y0} A ${r} ${r} 0 ${(a1 - a0) > 180 ? 1 : 0} 1 ${x1} ${y1}`;
+};
+
+// Blend two hex colours.
+function mix(a, b, t) {
+  const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
+  const ch = s => Math.round(((A >> s) & 255) + (((B >> s) & 255) - ((A >> s) & 255)) * t);
+  return "#" + [ch(16), ch(8), ch(0)].map(v => v.toString(16).padStart(2, "0")).join("");
+}
+// The bezel's colour at a given angle: the app's cyan -> violet, mirrored about
+// the vertical so the sweep closes on itself instead of banding at 12 o'clock.
+const bezelHue = a => mix("#00E5FF", "#8A2BE2", (a <= 180 ? a : 360 - a) / 180);
+
+// The bezel around the outside of the board: a dark machined ring lit by a neon
+// rim in the app's two colours, with lamps set into it. Drawn as short arcs
+// because SVG has no conic gradient — 72 is enough to read as continuous.
+function bezel(inset) {
+  const RMID = (R_BEZ0 + R_BEZ1) / 2, RW = R_BEZ1 - R_BEZ0;
+  const RN_IN = R_BEZ0 - 3, RN_OUT = R_BEZ1 + 3;
+  const N = 72, sw = 360 / N;
+  let neon = "", bloom = "", lamps = "";
+  for (let k = 0; k < N; k++) {
+    const a0 = k * sw - 0.45, a1 = (k + 1) * sw + 0.45;   // overlap: no seams
+    const col = bezelHue((k + 0.5) * sw);
+    neon += `<path d="${arcD(a0, a1, RN_OUT)}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round"/>`
+          + `<path d="${arcD(a0, a1, RN_IN)}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/>`;
+    bloom += `<path d="${arcD(a0, a1, RN_OUT)}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round"/>`;
+  }
+  for (let k = 0; k < 12; k++) {
+    const a = k * 30 + 15, [dx, dy] = pt(a, RMID);
+    const col = bezelHue(a);
+    lamps += `<g><circle cx="${dx}" cy="${dy}" r="${LAMP_R}" fill="${col}" opacity=".75" filter="url(#bezGlow)"/>
+      <circle cx="${dx}" cy="${dy}" r="4.8" fill="${col}"/>
+      <circle cx="${dx}" cy="${dy}" r="2.1" fill="#fff"/></g>`;
+  }
+  return `<g>
+    <g filter="url(#bezBloom)" opacity=".55">${bloom}</g>
+    <g filter="url(#bezGlow)" opacity=".95">${neon}</g>
+    <circle cx="${CX}" cy="${CY}" r="${RMID}" fill="none" stroke="url(#bezMetal)" stroke-width="${RW}"/>
+    <circle cx="${CX}" cy="${CY}" r="${RMID}" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="${RW * 0.36}"/>
+    ${inset || ""}
+    <circle cx="${CX}" cy="${CY}" r="${R_BEZ0 + 2.5}" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.4"/>
+    <circle cx="${CX}" cy="${CY}" r="${R_BEZ1 - 2.5}" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.4"/>
+    ${neon}${lamps}
+  </g>`;
+}
+
+// Mix a hex colour towards white — keeps the darker team colours visible when
+// they're drawn on the black outside the ring.
+function lift(hex, amt) {
+  const n = parseInt(hex.slice(1), 16), m = v => Math.round(v + (255 - v) * amt);
+  return "#" + [m(n >> 16 & 255), m(n >> 8 & 255), m(n & 255)]
+    .map(v => v.toString(16).padStart(2, "0")).join("");
+}
+
+// An arc band between two radii — used for the marker that flags whose slice
+// is in play. It sits OUTSIDE the ring, so it never has to fight the slice's
+// own colour (a white outline vanished on the white spade spaces).
+function bandPath(a0, a1, r0, r1) {
+  const o0 = pt(a0, r1), o1 = pt(a1, r1), i0 = pt(a0, r0), i1 = pt(a1, r0);
+  return `M ${i0[0]} ${i0[1]} L ${o0[0]} ${o0[1]} ` +
+         `A ${r1} ${r1} 0 0 1 ${o1[0]} ${o1[1]} L ${i1[0]} ${i1[1]} ` +
+         `A ${r0} ${r0} 0 0 0 ${i0[0]} ${i0[1]} Z`;
+}
+
+// The needle keeps a running angle so each spin travels forwards through a
+// couple of turns before easing onto the slice it wins on.
+let needleAngle = 0, lastSpinKey = "", animUntil = 0;
+function showSpinPill(sp) {
+  const pill = document.getElementById("spinPill");
+  if (!pill) return;
+  pill.textContent = "🎯 Spinner: " + sp.label;
+  pill.className = "spinpill" + (sp.places === 2 ? " mint" : "");
+  pill.style.display = "block";
+}
+function hideSpinPill() {
+  const pill = document.getElementById("spinPill");
+  if (pill) pill.style.display = "none";
+}
+
+function driveNeedle(isNewSpin) {
+  const el = document.getElementById("needle");
+  if (!el) return;
+  if (!isNewSpin) {
+    el.style.transition = "none"; el.style.transform = `rotate(${needleAngle}deg)`;
+    const f = document.getElementById("winFlash");
+    if (S && S.state.spinResult && S.state.spinResult.places) {
+      if (f) f.setAttribute("opacity", "1");
+      el.style.opacity = "0";
+      const fw = document.getElementById("fireworks");
+      if (fw) { fw.classList.add("go"); fw.setAttribute("opacity", "1"); }
+    }
+    return;
+  }
+  el.style.transition = "none";
+  el.style.transform = `rotate(${needleAngle - 360 * 4}deg)`;
+  setTimeout(() => {
+    const n = document.getElementById("needle");
+    if (!n) return;
+    n.style.transition = "transform 3.3s cubic-bezier(.12,.85,.10,1)";
+    n.style.transform = `rotate(${needleAngle}deg)`;
+  }, 24);
+  // reveal the win only once the needle has stopped; a loss shows nothing at all
+  const win = S && S.state.spinResult && S.state.spinResult.places;
+  if (win) setTimeout(() => {
+    const f = document.getElementById("winFlash"), n = document.getElementById("needle"),
+          fw = document.getElementById("fireworks");
+    // the needle bows out so the payoff owns the space
+    if (n) { n.style.transition = "opacity .3s ease"; n.style.opacity = "0"; }
+    if (f) { f.classList.add("winflash"); f.setAttribute("opacity", "1"); }
+    if (fw) { fw.classList.add("go"); fw.setAttribute("opacity", "1"); }
+    showSpinPill(S.state.spinResult);
+  }, 3380);
+}
+
+// Player pieces: flat button counters. Deliberately not 3D — just a rim, an
+// inset face, a ring line and a highlight arc so they read from directly above.
+function pawn(x, y, ti) {
+  const c = M.TEAM_COLORS[ti % M.TEAM_COLORS.length];
+  // No white ring — the pieces read against the bright slices via their own dark
+  // rim plus the drop shadow.
+  return `<g transform="translate(${x} ${y})" filter="url(#tokSh)">
+    <circle r="16" fill="${c.c2}" stroke="rgba(0,0,0,.55)" stroke-width="1.8"/>
+    <circle r="11.5" fill="url(#t${ti})"/>
+    <circle r="11.5" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="1.2"/>
+    <circle r="7" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1"/>
+    <path d="M -7.5 -6 A 9.5 9.5 0 0 1 7 -6.8" fill="none" stroke="#ffffff" stroke-width="1.8"
+          opacity=".35" stroke-linecap="round"/>
+    <text y="5" font-size="13" font-weight="900" fill="#ffffff" text-anchor="middle">${ti + 1}</text>
+  </g>`;
+}
+
+function drawBoard() {
+  const teams = (S && S.state.teams) || [];
+  const active = S ? (S.state.activeTeam || 0) : -1;
+  const n = M.BOARD.length, step = 360 / n;
+  const finTip = pt((n - 0.5) * step, R_OUT);   // rim end of the finish slice's spoke
+  let wedges = "", labels = "", toks = "", marks = "";
+
+  M.BOARD.forEach((sp, i) => {
+    const C = M.CATEGORIES[sp.cat];
+    const a0 = i * step, a1 = a0 + step, mid = a0 + step / 2;
+    const last = i === n - 1;
+    const here = teams.map((t, ti) => ({ t, ti })).filter(x => Math.min(x.t.pos | 0, n - 1) === i);
+    const onIt = here.some(x => x.ti === active);
+
+    // The last space is the finish. It's the only slice in the app's own
+    // cyan→purple, so it reads as "this one is different" at a glance rather
+    // than being another white spade you have to go looking for.
+    wedges += `<path d="${wedgePath(a0 + 0.35, a1 - 0.35)}" fill="url(#${last ? "gFINISH" : "g" + sp.cat})"
+        stroke="${last ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.28)"}" stroke-width="${last ? 2.4 : 1.5}"
+        ${sp.spade ? 'filter="url(#glowW)"' : ''}/>`;
+    // Smoked glass over the finish, the same treatment as the centre disc: the
+    // cyan->purple still shows through, but it's the only dark space on a board
+    // of bright ones, so it reads as the odd one out from across the room.
+    if (last) wedges += `<path d="${wedgePath(a0 + 0.35, a1 - 0.35)}" fill="#04060a" opacity=".78"/>`;
+
+    // Category name written along the spoke, like the printed board.
+    // Every label gets the SAME treatment — white with a dark outline — so they
+    // all read at identical weight whatever colour the slice is. (Per-category
+    // ink made the dark labels look lighter than the white ones.)
+    if (!last) {
+      const [lx, ly] = pt(mid, (R_IN + R_OUT) / 2);
+      const flip = mid > 180;
+      labels += `<text x="${lx}" y="${ly}" font-size="20" font-weight="800"
+        text-anchor="middle" dominant-baseline="central"
+        transform="rotate(${flip ? mid + 90 : mid - 90} ${lx} ${ly})"
+        style="letter-spacing:.5px" class="slab${sp.spade ? " spade" : ""}">${sp.spade ? "♠" : esc(C.label.toUpperCase())}</text>`;
+    }
+
+    // A chequered flag across the rim of the finish slice. The cyan->purple on
+    // its own wasn't enough — it sits right beside the purple DRAW IT slice, so
+    // the gradient's far end blends into its neighbour. The chequer says "end
+    // of the lap" outright, and reads from across the room.
+    if (last) {
+      // Inset well clear of the wedge outline on all four sides — flush to the
+      // slice edge it read as overflowing into the neighbouring slices.
+      const rows = 2, cols = 5, rA = R_OUT - 23, rB = R_OUT - 9;
+      // Width is set in arc length, not degrees, so the flag comes out the same
+      // width as the word beneath it and the two read as one block.
+      const span = (RIM_W / ((rA + rB) / 2)) * 180 / Math.PI, w0 = mid - span / 2;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        labels += `<path d="${bandPath(w0 + span * c / cols, w0 + span * (c + 1) / cols,
+                                       rA + (rB - rA) * r / rows, rA + (rB - rA) * (r + 1) / rows)}"
+          fill="${(r + c) % 2 ? "#ffffff" : "#0B0F17"}"/>`;
+      }
+    }
+
+    // START and FINISH are the two ends of the lap and sit side by side, so
+    // they're written the same way: out at the rim, squared to their own slice.
+    if (i === 0 || last) {
+      const [sx, sy] = pt(mid, R_OUT - 34);   // clears the chequered flag above it
+      // Sized to fit naturally rather than squeezed with textLength: pairing
+      // textLength with text-anchor="middle" nudges the word off its anchor in
+      // some browsers, which is what made FINISH look off-centre in its slice.
+      labels += `<text x="${sx}" y="${sy}" font-size="13" font-weight="900" class="slab"
+        text-anchor="middle" dominant-baseline="central"
+        transform="rotate(${mid} ${sx} ${sy})">${last ? "FINISH" : "START"}</text>`;
+    }
+
+    // quiet spin hint on the inner edge of Action/Random spaces: drawn in the
+    // slice's own ink colour so it reads as a marking on the board, not a badge
+    if (sp.spinner) {
+      const [gx, gy] = pt(mid, R_IN + 17);
+      labels += `<g transform="translate(${gx} ${gy}) rotate(${mid})" opacity=".5">
+        <path d="M -4.6 0 A 4.6 4.6 0 1 1 3.3 3.3" fill="none" stroke="${C.ink}" stroke-width="1.7" stroke-linecap="round"/>
+        <polygon points="2.7,5.6 6.2,2.2 1.3,1.6" fill="${C.ink}"/>
+      </g>`;
+    }
+
+    // Whose slice is in play: that arc of the bezel lights up in the team's
+    // colour, set into the ring itself. Works over any slice colour because it
+    // never touches the slice — including the white spades.
+    if (onIt) {
+      const col = M.TEAM_COLORS[active % M.TEAM_COLORS.length];
+      // lifted towards white so even the charcoal team reads against the metal
+      const bar = lift(col.c1, .32);
+      const mMid = (R_MARK0 + R_MARK1) / 2, thick = R_MARK1 - R_MARK0;
+      // Drawn as a round-capped arc rather than a wedge, so it comes out as a
+      // capsule sitting in the ring. The cap adds half the stroke width at each
+      // end, so the arc is pulled in by that much or it overruns the slice.
+      const cap = (thick / 2) / mMid * 180 / Math.PI;
+      // Lamps sit every 30 degrees and the slices are 7.5, so a lamp lands on
+      // EVERY slice boundary — held back far enough from each edge to clear a
+      // lamp's glow instead of butting into it.
+      const clear = (LAMP_R + 4) / mMid * 180 / Math.PI;
+      const [k0, k1] = [a0 + clear + cap, a1 - clear - cap];
+      marks += `<g filter="url(#glowN)">
+        <path d="${arcD(k0, k1, mMid)}" fill="none" stroke="${bar}"
+              stroke-width="${thick}" stroke-linecap="round"/>
+        <path d="${arcD(k0, k1, mMid + thick * 0.26)}" fill="none" stroke="#fff" opacity=".28"
+              stroke-width="${thick * 0.3}" stroke-linecap="round"/>
+      </g>`;
+    }
+
+    here.forEach((x, k) => {
+      // outer lane: between the category label and the START label
+      const rad = R_OUT - 100 + k * 28;
+      const [tx, ty] = pt(mid, Math.min(rad, R_OUT - 28));
+      toks += pawn(tx, ty, x.ti);
+    });
+  });
+
+  // Centre wheel: 28 slices echoing the board's palette. The paying slices are
+  // rendered as shiny diamonds. The needle lands on a slice and that IS the result.
+  const R_SPIN = R_IN - 10;
+  const arc = (a0, sweep, r) => {
+    const [x0, y0] = pt(a0, r), [x1, y1] = pt(a0 + sweep, r);
+    return `M ${CX} ${CY} L ${x0} ${y0} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${x1} ${y1} Z`;
+  };
+  // A winning slice is drawn as a cut gem: a faceted body, bright rim, specular
+  // highlights and a sparkle. It also protrudes slightly so it catches the eye.
+  // A paying slice is deep black with a glowing neon rim and its value printed
+  // on it — unmistakable against the coloured slices, and it pairs with the
+  // black needle. Cyan for +1, mint for +2.
+  // The slices are drawn in the board's colours, then covered by a smoked-glass
+  // black so they're only faintly visible — the needle spins on what looks like
+  // black. Nothing marks the winning slices: a loss shows nothing at all, and a
+  // win lights the whole disc up (see winFlash).
+  const res0 = (S && S.state.spinResult) || null;
+  const winNeon = res0 && res0.places === 2 ? "#00FFC6" : "#00E5FF";
+  // same gradients and same angles as the outer wedges, so the colours line up
+  const rays = M.spinnerLayout.map(sg =>
+    `<path d="${arc(sg.a0 + 0.35, sg.sweep - 0.7, R_SPIN)}" fill="url(#g${sg.cat})"/>`
+  ).join("");
+
+  const res = (S && S.state.spinResult) || null;
+  const key = S ? [res && res.slice, res && res.label, S.state.activeTeam, S.state.rev].join("|") : "";
+  const isNewSpin = !!res && key !== lastSpinKey;
+  if (isNewSpin) {
+    lastSpinKey = key;
+    // always travel forwards, then settle on the winning slice
+    needleAngle = Math.ceil((needleAngle + 720) / 360) * 360 + res.angle;
+    animUntil = Date.now() + 3400;
+  }
+  // don't rebuild mid-spin or the animation gets cut off
+  if (!isNewSpin && Date.now() < animUntil) return;
+
+  $("board").innerHTML = `<svg viewBox="0 0 ${VB} ${VB}" class="bsvg">
+    <defs>
+      ${Object.keys(M.CATEGORIES).map(k => {
+        const C = M.CATEGORIES[k];
+        return `<linearGradient id="g${k}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${C.c1}"/><stop offset="1" stop-color="${C.c2}"/></linearGradient>`;
+      }).join("")}
+      <!-- The finish space: the app's own cyan -> purple, used nowhere else on
+           the board, so the end of the lap is unmistakable. Runs along the
+           slice's own spoke (centre out to the rim) rather than corner to
+           corner, so the whole sweep is visible in one thin wedge. -->
+      <linearGradient id="gFINISH" gradientUnits="userSpaceOnUse"
+          x1="${CX}" y1="${CY}" x2="${finTip[0]}" y2="${finTip[1]}">
+        <stop offset="0" stop-color="#00E5FF"/><stop offset=".38" stop-color="#00A8FF"/>
+        <stop offset=".70" stop-color="#4361ee"/><stop offset="1" stop-color="#8A2BE2"/>
+      </linearGradient>
+      <!-- machined-metal look for the outer bezel: lit from the top, dark at
+           the bottom, with a lighter kick where the bevel catches light -->
+      <linearGradient id="bezMetal" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#39414f"/><stop offset=".26" stop-color="#161b25"/>
+        <stop offset=".56" stop-color="#252c39"/><stop offset="1" stop-color="#090c12"/>
+      </linearGradient>
+      <filter id="bezGlow" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDev="8" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <!-- wide, soft bloom thrown out into the black behind the bezel -->
+      <filter id="bezBloom" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDev="20" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="b"/></feMerge></filter>
+      ${M.TEAM_COLORS.map((c, i) => `<linearGradient id="t${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c.c1}"/><stop offset="1" stop-color="${c.c2}"/></linearGradient>`).join("")}
+      <filter id="glowW"><feGaussianBlur stdDev="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <radialGradient id="gemBody1" cx=".5" cy=".15" r=".9">
+        <stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#d8f4ff"/>
+        <stop offset=".8" stop-color="#7fd8ff"/><stop offset="1" stop-color="#2aa9d8"/></radialGradient>
+      <radialGradient id="gemBody2" cx=".5" cy=".15" r=".9">
+        <stop offset="0" stop-color="#ffffff"/><stop offset=".4" stop-color="#ccfff4"/>
+        <stop offset=".78" stop-color="#00FFC6"/><stop offset="1" stop-color="#00a887"/></radialGradient>
+      <linearGradient id="gemFacet" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+      <filter id="gemGlow" x="-70%" y="-70%" width="240%" height="240%">
+        <feGaussianBlur stdDev="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <linearGradient id="needleDark" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#1b2334"/><stop offset=".5" stop-color="#080c14"/><stop offset="1" stop-color="#02040a"/></linearGradient>
+      <linearGradient id="needleLite" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#4a5878"/><stop offset="1" stop-color="#141b29"/></linearGradient>
+      <radialGradient id="hubMetal" cx=".35" cy=".3" r=".8">
+        <stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#a9bcd8"/><stop offset="1" stop-color="#2d384f"/></radialGradient>
+      <clipPath id="discClip"><circle cx="${CX}" cy="${CY}" r="${R_SPIN}"/></clipPath>
+      <filter id="neonGlow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDev="5" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="needleSh"><feDropShadow dx="0" dy="4" stdDev="5" flood-color="#000" flood-opacity=".65"/></filter>
+      <linearGradient id="dia1" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="#bff4ff"/>
+        <stop offset=".6" stop-color="#ffffff"/><stop offset="1" stop-color="#7fd8ff"/></linearGradient>
+      <linearGradient id="dia2" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ffffff"/><stop offset=".3" stop-color="#b6fff0"/>
+        <stop offset=".55" stop-color="#ffffff"/><stop offset="1" stop-color="#00FFC6"/></linearGradient>
+      <linearGradient id="needleBlk" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#39445c"/><stop offset="1" stop-color="#05080e"/></linearGradient>
+      <filter id="diaGlow"><feGaussianBlur stdDev="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <linearGradient id="needleG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD100"/><stop offset="1" stop-color="#ff7a1a"/></linearGradient>
+      <!-- explicit region: the marker is a thick STROKE, and the default filter
+           box is measured from the path's geometry alone, which cropped the
+           glow into a hard rectangle -->
+      <filter id="glowN" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDev="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="tokSh"><feDropShadow dx="0" dy="3" stdDev="4" flood-color="#000" flood-opacity=".55"/></filter>
+    </defs>
+    ${bezel(marks)}
+    <g>${wedges}</g>
+    <g>${labels}</g>
+    <g>
+      <circle cx="${CX}" cy="${CY}" r="${R_IN - 4}" fill="#04060a" stroke="rgba(255,255,255,.10)" stroke-width="3"/>
+      ${rays}
+      <!-- smoked glass keeps the slices faintly visible, then the logo sits in
+           the middle of the disc instead of flat black -->
+      <circle cx="${CX}" cy="${CY}" r="${R_SPIN}" fill="#04060a" opacity=".82"/>
+      <image href="./wordsmash-logo.png" x="${CX - 92}" y="${CY - 76}" width="184" height="152"
+             preserveAspectRatio="xMidYMid meet" clip-path="url(#discClip)"/>
+      <circle cx="${CX}" cy="${CY}" r="${R_SPIN}" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="2"/>
+
+      <!-- fireworks, clipped to the black disc; only shown on a win -->
+      <g id="fireworks" opacity="0" clip-path="url(#discClip)">
+        ${[[0.42,25],[0.55,150],[0.38,255],[0.60,320],[0.30,85],[0.50,200]].map((b, bi) => {
+          const [bx, by] = pt(b[1], R_SPIN * b[0]);
+          const spokes = [...Array(12)].map((_, k) => {
+            const a = k * 30, [ex, ey] = [bx + Math.cos(a * Math.PI / 180) * 46, by + Math.sin(a * Math.PI / 180) * 46];
+            const col = k % 3 === 0 ? "#ffffff" : (k % 3 === 1 ? winNeon : "#FFD100");
+            return `<line x1="${bx}" y1="${by}" x2="${ex}" y2="${ey}" stroke="${col}" stroke-width="3.4" stroke-linecap="round"/>`;
+          }).join("");
+          return `<g class="fw" style="transform-origin:${bx}px ${by}px;animation-delay:${(bi * 0.18).toFixed(2)}s">${spokes}
+            <circle cx="${bx}" cy="${by}" r="5" fill="#ffffff"/></g>`;
+        }).join("")}
+      </g>
+
+      <g id="needle" style="transform-origin:${CX}px ${CY}px">
+        <g transform="translate(${CX} ${CY})" filter="url(#needleSh)">
+          <!-- Proper spinner arrow: sharp tip, flared barbs, shaft, rounded tail.
+               Black body with a bright rim so it reads against the dark disc. -->
+          <path d="M 0 ${-(R_SPIN - 20)}
+                   L 16 ${-(R_SPIN - 52)}
+                   L 6 ${-(R_SPIN - 60)}
+                   L 6 16 A 6 6 0 0 1 -6 16
+                   L -6 ${-(R_SPIN - 60)}
+                   L -16 ${-(R_SPIN - 52)} Z"
+                fill="url(#needleG)" stroke="#8a5500" stroke-width="1.4" stroke-linejoin="round"/>
+          <circle r="10" fill="url(#needleG)" stroke="#8a5500" stroke-width="1.4"/>
+          <circle r="3.2" fill="#3a2400"/>
+        </g>
+      </g>
+
+      <!-- Win reveal. Must be a SIBLING of #needle: nesting it inside meant
+           fading the needle out also hid the reveal. -->
+      <g id="winFlash" opacity="0">
+        <circle cx="${CX}" cy="${CY}" r="${R_SPIN}" fill="${winNeon}" opacity=".16"/>
+        <circle cx="${CX}" cy="${CY}" r="${R_SPIN - 2}" fill="none" stroke="${winNeon}" stroke-width="6" filter="url(#neonGlow)"/>
+        <text x="${CX}" y="${CY}" fill="${winNeon}" font-size="78" font-weight="900" stroke="#04060a" stroke-width="6" paint-order="stroke"
+              text-anchor="middle" dominant-baseline="central" filter="url(#neonGlow)"
+          >${res0 && res0.places ? "+" + res0.places : ""}</text>
+      </g>
+
+      </g>
+    <g>${toks}</g>
+  </svg>`;
+  driveNeedle(isNewSpin);
+}
+
+function drawSide() {
+  const st = S && S.state;
+  const teams = (st && st.teams) || [];
+  if (!teams.length) {
+    $("turnName").textContent = "";
+    $("catBig").textContent = "";
+    $("catBig").className = "catbig hint";
+    $("catBig").style.removeProperty("--c1");
+  } else if (st.phase === "over") {
+    const best = teams.slice().sort((a,b)=>(b.pos|0)-(a.pos|0))[0];
+    $("turnName").textContent = "🏆 " + (best ? best.name : "");
+    $("catBig").textContent = "WINNER!";
+  } else {
+    const t = teams[(st.activeTeam||0) % teams.length];
+    $("turnName").textContent = t ? t.name : "…";
+    const C = M.CATEGORIES[st.cat || "OBJECT"] || M.CATEGORIES.OBJECT;
+    // "Spade — all play" is far too long for the chip and wrapped onto two
+    // lines, so the spade gets a short form of its own.
+    const catName = (st.cat === "SPADE") ? "♠ ALL PLAY" : C.label.toUpperCase();
+    $("catBig").textContent = (st.turnActive ? C.verb.toUpperCase() + " · " : "") + catName;
+    $("catBig").className = "catbig";
+    $("catBig").style.setProperty("--c1", C.c1);
+    $("catBig").style.setProperty("--c2", C.c2);
+  }
+  // Hold the announcement back until the arrow has stopped — otherwise the TV
+  // spoils the result mid-spin.
+  const sp = st && st.spinResult;
+  if (sp && sp.places && Date.now() >= animUntil) showSpinPill(sp);
+  else hideSpinPill();
+
+  // nothing to show before a game starts: hide the readouts entirely
+  const live = teams.length > 0;
+  const tl = $("hudTL"), tr = $("hudTR");
+  if (tl) tl.style.visibility = live ? "visible" : "hidden";
+  if (tr) tr.style.visibility = live ? "visible" : "hidden";
+
+  const max = teams.length ? Math.max(...teams.map(t=>t.pos|0)) : 0;
+  $("teams").innerHTML = teams.length ? teams.map((t,i) => {
+    const col = M.TEAM_COLORS[i % M.TEAM_COLORS.length];
+    const act = st && (st.activeTeam||0) % teams.length === i && st.phase === "play";
+    const leading = (t.pos|0) === max && max > 0;
+    return `<div class="trow ${act?'active':''}">
+      <span class="swatch" style="--t1:${col.c1};--t2:${col.c2}"></span>
+      <span class="nm">${esc(t.name)}</span>
+      <span class="crown">${leading ? '👑' : ''}</span>
+      <span class="ps">${t.pos|0}</span></div>`;
+  }).join("") : "";
+}
+
+function tick() {
+  const st = S && S.state, el = $("clock"), tu = $("timeUp");
+  if (!st || !st.timerEnds) {
+    el.textContent = "0:00"; el.className = "clock";
+    tu.classList.toggle("show", Date.now() < timeUpUntil);
+    return;
+  }
+  const rem = Math.max(0, Math.ceil((st.timerEnds - Date.now())/1000));
+  el.textContent = fmt(rem);
+  el.className = "clock" + (rem === 0 ? " done" : rem <= 10 ? " warn" : "");
+
+  // Sound the buzzer off the LOCAL countdown, not the polled state: the turn is
+  // usually ended by a phone before the next poll lands, so waiting for the
+  // server would mean missing the moment.
+  if (st.timerEnds !== lastEndsSeen) { lastEndsSeen = st.timerEnds; buzzedThisTurn = false; timeUpUntil = 0; }
+  if (!buzzedThisTurn && rem === 0 && st.turnActive) {
+    buzzedThisTurn = true; playBuzzer();
+    // latch the banner: the turn ends moments later and clears the timer, so
+    // reading it live off `rem` would flash it for a single frame
+    timeUpUntil = Date.now() + 5000;
+  }
+  tu.classList.toggle("show", Date.now() < timeUpUntil);
+}
+let lastEndsSeen = 0, buzzedThisTurn = false, timeUpUntil = 0;
+setInterval(tick, 250);
+
+async function poll() {
+  if (!CODE) { $("turnName").textContent = ""; $("catBig").textContent = ""; return; }
+  if (!cloudOn()) { $("turnName").textContent = ""; $("catBig").textContent = ""; return; }
+  try {
+    const r = await fetch(API_BASE + "/api/session/" + CODE + (lastV ? "?v="+lastV : ""));
+    if (!r.ok) throw new Error("not found");
+    const d = await r.json();
+    if (d.unchanged) return;
+    lastV = d.updated_at; S = d;
+    drawBoard(); drawSide();
+  } catch (e) { /* keep polling */ }
+}
+drawBoard(); drawSide();
+poll(); setInterval(poll, 1500);
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+name = "masgames-api"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# Created with:  wrangler d1 create masgames
+# Paste the database_id it prints below, then run:
+#   wrangler d1 execute masgames --file=./schema.sql --remote
+#   wrangler deploy
+[[d1_databases]]
+binding = "DB"
+database_name = "masgames"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"

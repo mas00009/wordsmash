@@ -1,0 +1,1721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Word Smash</title>
+<meta name="description" content="AI-generated party game cards, themed for your group." />
+
+<!-- PWA / installable app -->
+<link rel="manifest" href="./manifest.webmanifest" />
+<meta name="theme-color" content="#0B0F17" />
+<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+<link rel="icon" type="image/png" href="./icon-192.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Word Smash" />
+
+<style>
+  :root {
+    /* MAS brand palette — cyan / purple / gold / mint on near-black.
+       Some var names are historical (e.g. --pink now holds brand cyan) to keep edits minimal. */
+    --bg: #0B0F17;
+    --panel: #121826;
+    --panel-2: #1a2233;
+    --ink: #ffffff;
+    --muted: #93a1c0;
+    --line: rgba(255,255,255,.14);
+    --pink: #00E5FF;     /* primary accent — brand cyan */
+    --violet: #8A2BE2;   /* brand purple */
+    --cyan: #00E5FF;     /* brand cyan */
+    --yellow: #FFD100;   /* brand gold */
+    --orange: #8A2BE2;   /* gradient partner — purple (so cyan→purple gradients) */
+    --mint: #00FFC6;     /* brand mint */
+    --danger: #ff5470;
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; overscroll-behavior: none; }
+  body {
+    font-family: ui-rounded, "SF Pro Rounded", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
+  }
+  button, input, select, textarea { font-family: inherit; }
+
+  .app {
+    position: relative; max-width: 480px; margin: 0 auto;
+    height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
+    background:
+      radial-gradient(600px 380px at 92% 30%, rgba(0,229,255,.16) 0%, transparent 55%),
+      radial-gradient(520px 420px at 50% 118%, rgba(138,43,226,.42) 0%, transparent 58%),
+      radial-gradient(420px 320px at 12% 100%, rgba(255,209,0,.14) 0%, transparent 55%),
+      linear-gradient(180deg, #0a0e16, var(--bg));
+  }
+
+  header.bar {
+    /* Persistent app bar: stays on top of every screen/overlay */
+    display: flex; align-items: center; gap: 8px; position: relative; flex: 0 0 auto;
+    padding: calc(10px + var(--sat)) 14px 12px; z-index: 80;
+    background: #0b1019;
+  }
+  header.bar::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 0; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan) 28%, var(--violet) 72%, transparent);
+    box-shadow: 0 0 12px rgba(0,229,255,.45); opacity: .85; }
+  /* screens that carry their own big heading don't need the mark or the rule */
+  body.chrome-bare header.bar::after { display: none; }
+  /* One continuous field for the whole home screen. The bar, .empty and .app
+     each used to paint their own background, and with the rule gone the joins
+     between those three tones showed as bands. Only .app paints now. */
+  /* flat near-black so the bar melts into the video's own dark starfield */
+  body.is-home .app { background: #04060c; }
+  body.is-home header.bar { background: transparent; }
+  body.is-home .empty { background: none; }
+  /* branding only — resetting moved to Menu -> Reset game */
+  .brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-width: 0; border-radius: 12px; }
+  /* Current screen name: full width under the rule, not squeezed into the bar */
+  /* Sits between the bar and the overlays, so it needs its own layer above them
+     and its height folded into --headerH or the overlays would cover it. */
+  .pagehead { flex: 0 0 auto; padding: 13px 18px 3px; font-size: 26px; font-weight: 900;
+    letter-spacing: -.3px; color: #eaf1ff; line-height: 1.15;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    position: relative; z-index: 70; background: #0b1019; }
+  .pagehead[hidden] { display: none; }
+  .logo { height: 42px; width: auto; max-width: 148px; flex: none; object-fit: contain; filter: drop-shadow(0 3px 10px rgba(0,229,255,.45)); }
+  header.bar .title { font-weight: 900; font-size: 18px; line-height: 1; letter-spacing: .3px;
+    background: linear-gradient(90deg, #fff, var(--yellow)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .subhead { padding: 9px 16px 4px; font-size: 15px; font-weight: 800; letter-spacing: .2px; color: #c8d4ec;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grow { flex: 1; }
+  .iconbtn {
+    width: 34px; height: 34px; border: none; background: transparent; color: #fff;
+    font-size: 18px; display: grid; place-items: center; cursor: pointer; padding: 0; }
+  .iconbtn:active { transform: scale(.88); }
+  /* .iconbtn sets display:grid, and an author display rule beats the UA's
+     [hidden]{display:none} — without this the hidden ✕ still rendered. */
+  .iconbtn[hidden] { display: none; }
+  /* Claim the focus ring, or the OS draws its own in the system accent colour —
+     that's the gold ring that appeared round the gear after tapping it. */
+  .iconbtn:focus { outline: none; }
+  .iconbtn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  /* Close / small action buttons: the same glass-in-a-gradient-edge as the home
+     screen buttons, so a bare ✕ glyph doesn't read as unstyled. Deliberately
+     NOT on plain .iconbtn — the header gear must stay box-free. */
+  .iconbtn.close, .iconbtn.chip {
+    width: 36px; height: 36px; border-radius: 50%; position: relative; flex: none;
+    border: 1.5px solid transparent;
+    background: linear-gradient(180deg, #182033, #0d1220) padding-box,
+                linear-gradient(140deg, var(--cyan), var(--violet)) border-box;
+    box-shadow: 0 4px 14px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.10);
+    transition: transform .12s ease, box-shadow .12s ease; }
+  .iconbtn.close:active, .iconbtn.chip:active { transform: scale(.9);
+    box-shadow: 0 0 18px rgba(0,229,255,.35), inset 0 1px 0 rgba(255,255,255,.08); }
+  /* the ✕ is drawn, not typed — two strokes read far cleaner than the glyph */
+  .iconbtn.close { font-size: 0; }
+  .iconbtn.close::before, .iconbtn.close::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 15px; height: 2px;
+    border-radius: 2px; background: var(--cyan); box-shadow: 0 0 8px rgba(0,229,255,.7); }
+  .iconbtn.close::before { transform: translate(-50%,-50%) rotate(45deg); }
+  .iconbtn.close::after { transform: translate(-50%,-50%) rotate(-45deg); }
+  .iconbtn.chip { color: var(--cyan); font-size: 17px; text-shadow: 0 0 8px rgba(0,229,255,.6); }
+  /* the menu gear gets a thin ring only — a filled chip would fight the icon's
+     own glow, and the header icons are meant to read as icons, not boxes */
+  .iconbtn.ring { width: 38px; height: 38px; border-radius: 50%;
+    border: 1.5px solid rgba(0,229,255,.5);
+    box-shadow: 0 0 14px rgba(0,229,255,.16), inset 0 0 12px rgba(0,229,255,.07); }
+  /* Header icons: Mas's icon pack, ONE 72px file each (deliberately no srcset).
+     Multiple srcset candidates let the browser show one then swap to another,
+     which read as a bright->dark blink. A single file has nothing to swap to,
+     and each icon is pre-brightened so it holds up at 24/48/72px alike.
+     Do NOT add a CSS filter here — that promotes a GPU layer that
+     re-rasterizes after load. Brightness/glow are baked into the PNGs. */
+  .ico { width: 24px; height: 24px; display: block; }
+
+  main.stage { flex: 1; position: relative; display: flex; flex-direction: column; min-height: 0; }
+
+  /* tap-to-flip deck (phone = the deck) */
+  .flipwrap { width: 100%; max-width: 340px; aspect-ratio: 3/4.2; perspective: 1500px; position: relative; }
+  /* stacked-deck illusion behind the top card */
+  .flipwrap::before, .flipwrap::after { content: ""; position: absolute; inset: 0; border-radius: 26px; background: linear-gradient(150deg, var(--violet), var(--pink)); border: 3px solid rgba(255,255,255,.35); z-index: -1; }
+  .flipwrap::before { transform: translate(7px, 9px) rotate(2.5deg); opacity: .55; }
+  .flipwrap::after { transform: translate(-6px, 5px) rotate(-2deg); opacity: .4; }
+  .face { position: absolute; inset: 0; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 26px; padding: 22px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 22px 55px rgba(0,0,0,.45), 0 0 0 6px rgba(255,255,255,.06); border: 3px solid rgba(255,255,255,.5); }
+  .face.front { transform: rotateY(180deg); background: linear-gradient(155deg, var(--c1, #ff2d78), var(--c2, #7c3aed));
+    color: var(--ink, #fff); }
+  .face.back { align-items: center; justify-content: center; text-align: center;
+    background:
+      radial-gradient(130% 100% at 50% 0%, rgba(0,229,255,.12), transparent 55%),
+      radial-gradient(130% 100% at 50% 100%, rgba(138,43,226,.16), transparent 55%),
+      radial-gradient(115% 90% at 50% 45%, #0e1524 0%, #05070c 74%); border-color: rgba(0,229,255,.5); }
+  .backlogo-img { width: 84%; max-width: 260px; height: auto; aspect-ratio: 1/1; object-fit: contain; filter: drop-shadow(0 6px 20px rgba(0,229,255,.3)); }
+  .backword { font-weight: 900; font-size: 22px; letter-spacing: .2em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.4); }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: .88; } 50% { transform: scale(1.06); opacity: 1; } }
+  /* card front inner content (shared with cardInner) */
+  .cardface .badge { align-self: flex-start; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .1em; padding: 7px 13px; border-radius: 999px; background: rgba(0,0,0,.28); color: #fff; }
+  /* on the light categories a black wash would be invisible — flip the chip */
+  .cardface.onlight .badge, .mini.onlight .badge { background: rgba(255,255,255,.30); color: inherit; }
+  .cardface .main { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; line-height: 1.12; padding: 10px 0; text-shadow: 0 2px 10px rgba(0,0,0,.18); }
+  .cardface .main.sm { font-size: 25px; } .cardface .main.md { font-size: 31px; } .cardface .main.lg { font-size: 38px; }
+  .cardface .lines { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .cardface .lines .li { background: rgba(0,0,0,.32); border-radius: 11px; padding: 10px 12px; font-size: 15px; font-weight: 700; text-align: center; color: #fff; }
+  /* no big title (e.g. Articulate): let the list fill & centre the card */
+  .cardface .lines.solo { flex: 1; justify-content: center; margin-top: 0; }
+  /* long lists (e.g. Scattergories 12): shrink rows, allow scroll */
+  .cardface .lines.many { gap: 5px; }
+  .cardface .lines.many .li { font-size: 13px; padding: 6px 9px; font-weight: 600; }
+  .cardface.listcard .main { flex: 0 0 auto; padding: 4px 0 8px; }
+  .cardface.listcard .lines.many { flex: 1; min-height: 0; overflow-y: auto; justify-content: flex-start; }
+  /* Scattergories letter roller */
+  .rollbar { display: flex; align-items: center; gap: 12px; }
+  .rollbar .rlabel { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .rollbar #rollLetter { font-size: 40px; font-weight: 900; width: 66px; height: 66px; display: grid; place-items: center; border-radius: 18px; color: #fff;
+    background: linear-gradient(135deg, var(--cyan), var(--violet)); border: 3px solid rgba(255,255,255,.55); box-shadow: 0 10px 26px rgba(0,0,0,.35); }
+  .rollbar.pop #rollLetter { animation: pop .32s ease; }
+  @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .cardface .note { font-size: 13px; color: inherit; opacity: .9; text-align: center; margin-top: 12px; font-weight: 600; }
+
+  .controls-row { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 6px 16px calc(10px + var(--sab)); }
+  .navbtn { width: 58px; height: 58px; border-radius: 50%; border: none; color: #fff; font-size: 24px; cursor: pointer; font-weight: 900;
+    background: linear-gradient(135deg, var(--pink), var(--orange)); box-shadow: 0 8px 22px rgba(255,45,120,.45); }
+  .navbtn:active { transform: scale(.9); }
+  .navbtn:disabled { opacity: .4; box-shadow: none; }
+  .counter { min-width: 78px; text-align: center; font-weight: 900; font-size: 16px; }
+  .counter small { display: block; color: var(--muted); font-weight: 600; font-size: 11px; margin-top: 2px; }
+  .chip { flex: 0 0 auto; border: 2px solid var(--line); background: rgba(255,255,255,.08); color: #fff; border-radius: 999px; padding: 8px 15px; font-size: 13px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+  .chip:active { transform: scale(.95); }
+
+  /* Home screen: the whole backdrop is one animated scene (logo baked in), with
+     the strapline and buttons overlaid on its lower third. */
+  /* Original home rhythm, new artwork: the badge is baked into the video's top
+     ~third, so padding-top clears it and space-evenly seats the strapline just
+     beneath the badge with the buttons floating in the lower half — the same
+     logo → strapline → buttons cadence the old three-block layout had. */
+  .empty { position: relative; flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: space-evenly; gap: 0;
+    text-align: center; padding: 28vh 18px calc(12px + var(--sab)); color: var(--muted); min-height: 0;
+    background: #04060c; }
+  /* Runs the full app height — up behind the (transparent) bar and settings
+     icon. The bar sits at z 80, so it stays tappable over the artwork. */
+  .homebg { position: absolute; left: 0; right: 0; bottom: 0;
+    top: calc(-1 * var(--headerH, 74px)); width: 100%; height: auto;
+    object-fit: cover; object-position: center top; z-index: 0; }
+  /* dark ramp at the bottom so the buttons sit on something quiet */
+  .homeveil { position: absolute; left: 0; right: 0; bottom: 0;
+    top: calc(-1 * var(--headerH, 74px)); z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
+      rgba(4,6,12,0) 52%, rgba(4,6,12,.72) 84%, rgba(4,6,12,.92) 100%); }
+  .empty .tagblock, .empty .home-actions { position: relative; z-index: 2; }
+  /* strapline + its rule travel together as one block, so the even spacing
+     applies between logo / strapline / buttons and not inside the pair */
+  .tagblock { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 9px; }
+  .tagline { flex: 0 0 auto; margin: 0; font-size: 15px; font-weight: 800; line-height: 1.4;
+    color: #dbe4f5; text-transform: uppercase; letter-spacing: .09em; }
+  /* hairline · diamond · hairline under the tagline */
+  .tagrule { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; width: 190px; }
+  .tagrule span { flex: 1; height: 1px; }
+  .tagrule span:first-child { background: linear-gradient(90deg, transparent, var(--cyan)); }
+  .tagrule span:last-child { background: linear-gradient(90deg, var(--violet), transparent); }
+  .tagrule i { width: 7px; height: 7px; flex: none; transform: rotate(45deg); border-radius: 1px;
+    background: #fff; box-shadow: 0 0 8px rgba(255,255,255,.8); }
+  .home-actions { flex: 0 0 auto; width: 100%; max-width: 352px; display: flex; flex-direction: column; gap: 9px; }
+  .spinner { width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; vertical-align: -3px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100px + var(--sab)); background: rgba(0,0,0,.82); color: #fff; padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 700; z-index: 40; max-width: 88%; text-align: center; }
+  .toast.err { background: var(--danger); }
+
+  /* Overlays sit BELOW the persistent header (--headerH set from JS) */
+  /* All cards is a popup, not a page: it layers over the menu so closing it
+     puts you straight back where you were instead of unwinding a screen. */
+  /* above the menu sheet (z 50), below the popup itself — the shared .scrim is
+     z 45, which dimmed the app but left the sheet bright behind the popup */
+  #cardsScrim { z-index: 56; }
+  .cardspop { position: absolute; left: 12px; right: 12px; top: 50%; transform: translateY(-50%) scale(.96);
+    max-height: 78dvh; z-index: 58; display: none; flex-direction: column; overflow: hidden;
+    border-radius: 22px; border: 1px solid rgba(255,255,255,.09);
+    background: linear-gradient(180deg, #141c2f, #0a0e1c);
+    box-shadow: 0 26px 70px rgba(0,0,0,.7); opacity: 0; transition: opacity .18s, transform .18s; }
+  .cardspop.open { display: flex; opacity: 1; transform: translateY(-50%) scale(1); }
+  .cardspop-head { display: flex; align-items: center; gap: 12px; padding: 14px 14px 12px;
+    border-bottom: 1px solid var(--line); }
+  .cph-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .cph-txt b { font-size: 17px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cph-txt small { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .grid-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .mini { border-radius: 14px; padding: 10px; min-height: 92px; display: flex; flex-direction: column; background: linear-gradient(155deg, var(--c1), var(--c2)); border: 2px solid rgba(255,255,255,.4); cursor: pointer; color: var(--ink, #fff); }
+  .mini .badge { font-size: 9px; align-self: flex-start; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; background: rgba(0,0,0,.28); padding: 4px 9px; border-radius: 999px; }
+  .mini .t { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 14.5px; padding: 6px 0; line-height: 1.2; }
+
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 45; opacity: 0; pointer-events: none; transition: .2s; }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: var(--panel); border-top-left-radius: 26px; border-top-right-radius: 26px;
+    border-top: 3px solid var(--pink); max-height: calc(100dvh - var(--headerH, 74px) - 6px); overflow-y: auto;
+    transform: translateY(100%); transition: transform .25s ease; padding: 8px 18px calc(20px + var(--sab)); }
+  .sheet.open { transform: translateY(0); }
+  .handle { width: 44px; height: 5px; border-radius: 3px; background: var(--line); margin: 8px auto 12px; }
+  .sheet h2 { font-size: 20px; margin: 0 0 14px; font-weight: 900;
+    background: linear-gradient(90deg, var(--pink), var(--yellow)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; font-weight: 800; }
+  .field input, .field select, .field textarea { width: 100%; padding: 13px; border-radius: 13px; border: 2px solid var(--line); background: var(--panel-2); color: var(--ink); font-size: 16px; font-weight: 600; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--pink); }
+  .field textarea { resize: vertical; min-height: 56px; }
+  .field .hint { font-size: 11px; color: var(--muted); margin-top: 5px; font-weight: 600; }
+  .field .hint a { color: var(--cyan); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  /* collapsible settings sections */
+  .sect { border: 2px solid var(--line); border-radius: 14px; margin-bottom: 12px; background: var(--panel-2); overflow: hidden; }
+  .sect > summary { list-style: none; cursor: pointer; padding: 14px; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
+  .sect > summary::-webkit-details-marker { display: none; }
+  /* same OS-accent focus ring problem as the icon buttons — a gold box appeared
+     round whichever section had last been tapped */
+  .sect > summary:focus { outline: none; }
+  .sect > summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+  .sect > summary .chev { transition: transform .2s; color: var(--muted); font-size: 22px; line-height: 1; }
+  .sect[open] > summary .chev { transform: rotate(90deg); }
+  .sect > summary .sglabel { display: flex; align-items: center; gap: 9px; }
+  .mi { flex: none; width: 19px; height: 19px; color: var(--cyan);
+    filter: drop-shadow(0 0 5px rgba(0,229,255,.5)); }
+  .mi svg { width: 100%; height: 100%; display: block; }
+  .sect-body { padding: 2px 14px 14px; }
+  /* Decks is a direct action now, not an expandable section — styled to match a
+     section header so the menu still reads as one consistent list. */
+  .sectbtn { width: 100%; appearance: none; cursor: pointer; text-align: left;
+    border: 2px solid var(--line); border-radius: 14px; margin-bottom: 12px;
+    background: var(--panel-2); color: var(--ink); padding: 14px;
+    font-weight: 800; font-size: 15px; display: flex; align-items: center;
+    justify-content: space-between; }
+  .sectbtn .sglabel { display: flex; align-items: center; gap: 9px; }
+  .sectbtn .chev { color: var(--muted); font-size: 22px; line-height: 1; }
+  .sectbtn:active { transform: scale(.99); }
+  .sectbtn[hidden] { display: none; }
+  .sectbtn:focus { outline: none; }
+  .sectbtn:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+  /* Create a deck / Deck options now sit inside Decks — recess them so the
+     nesting reads, and don't double up the panel background. */
+  .sect .sect.sub { background: rgba(0,0,0,.22); border-color: rgba(255,255,255,.10);
+    margin: 10px 0 0; border-radius: 12px; }
+  .sect .sect.sub > summary { padding: 12px 13px; font-size: 14px; }
+  .sect .sect.sub .sect-body { padding: 2px 13px 13px; }
+  .sect-body .field:last-child { margin-bottom: 2px; }
+  .btn { appearance: none; border: none; background: rgba(255,255,255,.12); color: var(--ink); padding: 15px; border-radius: 14px; cursor: pointer; font-size: 16px; font-weight: 900; width: 100%; }
+  .btn.primary { background: linear-gradient(135deg, var(--pink), var(--orange)); box-shadow: 0 10px 28px rgba(255,45,120,.5); color: #fff; }
+  .btn.primary:active { filter: brightness(1.08); }
+  .btn:disabled { opacity: .5; box-shadow: none; }
+  .btn-row { display: flex; gap: 10px; margin-top: 4px; }
+  .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 18px; }
+  .menu-grid .btn { padding: 13px 8px; font-size: 13.5px; }
+  .btn.sm { padding: 12px; font-size: 14px; }
+  /* Home screen actions: dark glass in a cyan->violet gradient edge, the same
+     two colours as the header rule and the board's bezel. The gradient lives on
+     the border via two backgrounds — padding-box for the face, border-box for
+     the edge — so the corners stay properly rounded. */
+  .homebtn { position: relative; display: flex; align-items: center; gap: 12px;
+    text-align: left; padding: 11px 14px;
+    border: 1.5px solid transparent; border-radius: 15px; overflow: hidden;
+    background: linear-gradient(180deg, #182033, #0d1220) padding-box,
+                linear-gradient(140deg, var(--cyan), var(--violet)) border-box;
+    box-shadow: 0 10px 26px rgba(0,0,0,.45), 0 0 18px rgba(0,229,255,.10), inset 0 1px 0 rgba(255,255,255,.10);
+    transition: transform .12s ease, box-shadow .12s ease; }
+  .homebtn::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 52%;
+    background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0)); pointer-events: none; }
+  .homebtn:active { transform: translateY(2px) scale(.985);
+    box-shadow: 0 4px 14px rgba(0,0,0,.5), 0 0 24px rgba(0,229,255,.26), inset 0 1px 0 rgba(255,255,255,.08); }
+  .hb-ico { flex: none; width: 23px; height: 23px; color: var(--cyan);
+    filter: drop-shadow(0 0 6px rgba(0,229,255,.55)); }
+  .hb-ico svg { width: 100%; height: 100%; display: block; }
+  .hb-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .hb-txt b { font-size: 15px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: #fff; }
+  .hb-txt small { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .hb-go { flex: none; width: 14px; height: 14px; color: rgba(255,255,255,.45); }
+  .hb-go svg { width: 100%; height: 100%; display: block; }
+  /* Same treatment, scaled to sit among the menu rows rather than dominate them */
+  .homebtn.compact { padding: 10px 13px; gap: 11px; border-radius: 13px; }
+  .homebtn.compact .hb-ico { width: 20px; height: 20px; }
+  .homebtn.compact .hb-txt b { font-size: 14px; letter-spacing: .04em; }
+  .homebtn.compact .hb-txt small { font-size: 11.5px; }
+  .homebtn.compact .hb-go { width: 13px; height: 13px; }
+  /* All three home actions share one treatment — no lead/ghost variants. */
+
+  /* cloud overlay */
+  .tabs { display: flex; gap: 8px; padding: 12px 14px 6px; }
+  .tab { flex: 1; padding: 11px; border-radius: 12px; border: 2px solid var(--line); background: rgba(255,255,255,.06); color: var(--muted); font-weight: 800; font-size: 14px; cursor: pointer; }
+  .tab.active { background: linear-gradient(135deg, var(--pink), var(--orange)); color: #fff; border-color: transparent; }
+  #cloudList { flex: 1; overflow-y: auto; padding: 14px; }
+  /* Compact single line per deck so the whole library is scannable at once. */
+  .deckrow { display: flex; align-items: baseline; gap: 8px; padding: 9px 11px; border-radius: 10px;
+    background: rgba(255,255,255,.04); border: 1px solid var(--line); margin-bottom: 6px; cursor: pointer; }
+  .deckrow:active { background: rgba(0,229,255,.10); }
+  .deckrow .n { flex: 1; min-width: 0; font-weight: 800; font-size: 14.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .deckrow .s { flex: none; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .confirm-row { border: 2px solid var(--danger); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px;
+    background: rgba(255,84,112,.08); }
+  .confirm-row[hidden] { display: none; }
+  .confirm-row .ctxt { display: block; font-size: 13.5px; font-weight: 700; color: #ffd7de; margin-bottom: 10px; }
+  .confirm-row .cbtns { display: flex; gap: 8px; }
+  .btn.danger { background: var(--danger); color: #fff; }
+  .deckrow .del { color: var(--danger); font-size: 19px; padding: 4px 8px; cursor: pointer; }
+  .cloud-msg { padding: 34px 20px; text-align: center; color: var(--muted); font-weight: 600; line-height: 1.5; }
+
+  .install { position: absolute; left: 12px; right: 12px; bottom: calc(12px + var(--sab)); z-index: 44;
+    background: var(--panel-2); border: 2px solid var(--pink); border-radius: 16px; padding: 13px 15px;
+    display: none; align-items: center; gap: 10px; box-shadow: 0 12px 34px rgba(0,0,0,.45); }
+  .install.show { display: flex; }
+  .install .txt { flex: 1; font-size: 13px; line-height: 1.4; font-weight: 600; }
+  .install .x { color: var(--muted); font-size: 20px; cursor: pointer; padding: 0 4px; }
+
+  /* timer modal */
+  .modal { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%) scale(.95); z-index: 50; width: min(360px, 88%);
+    background: var(--panel); border: 3px solid var(--pink); border-radius: 22px; padding: 20px; text-align: center;
+    opacity: 0; pointer-events: none; transition: .2s; }
+  .modal.open { opacity: 1; pointer-events: auto; transform: translate(-50%,-50%) scale(1); }
+  .modal-title { font-weight: 900; font-size: 16px; margin-bottom: 8px; }
+  .tclock { font-size: 58px; font-weight: 900; letter-spacing: 1px; margin: 4px 0 16px; font-variant-numeric: tabular-nums; }
+  .tclock.warn { color: var(--yellow); } .tclock.done { color: var(--danger); }
+  .tp { padding: 10px 13px; border-radius: 12px; border: 2px solid var(--line); background: rgba(255,255,255,.06); color: #fff; font-weight: 800; cursor: pointer; }
+  .tp.active { background: linear-gradient(135deg, var(--cyan), var(--violet)); border-color: transparent; }
+  .chip.live { background: linear-gradient(135deg, var(--pink), var(--orange)); color: #fff; border-color: transparent; }
+
+  /* scoreboard */
+  .addteam { display: flex; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .addteam input { flex: 1; padding: 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel-2); color: #fff; font-size: 16px; font-weight: 600; }
+  /* same reason as .codeinput:focus — claim the focus ring before the OS does */
+  .addteam input:focus, .tname:focus { outline: none; border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0,229,255,.16); }
+  .teamrow { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 15px; background: var(--panel-2); border: 2px solid var(--line); margin-bottom: 10px; }
+  .teamrow .tn { flex: 1; font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .teamrow .sc { font-size: 26px; font-weight: 900; min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+  .teamrow .sbtn { width: 42px; height: 42px; border-radius: 12px; border: none; font-size: 24px; font-weight: 900; color: #fff; cursor: pointer; line-height: 1; }
+  .teamrow .sbtn:active { transform: scale(.9); }
+  .teamrow .plus { background: linear-gradient(135deg, var(--pink), var(--orange)); }
+  .teamrow .minus { background: rgba(255,255,255,.12); }
+  .teamrow .rm { color: var(--danger); font-size: 17px; padding: 4px; cursor: pointer; }
+
+  /* time's-up flash */
+  .flash { position: absolute; inset: 0; background: var(--danger); opacity: 0; pointer-events: none; z-index: 60; }
+  .flash.go { animation: flashfx .55s ease 3; }
+  @keyframes flashfx { 0%,100% { opacity: 0; } 50% { opacity: .5; } }
+
+  /* Celebrations: a particle canvas over everything, and a headline that pops
+     with it (spinner bonuses, steals, winning the game). */
+  .fxcanvas { position: absolute; inset: 0; width: 100%; height: 100%;
+    z-index: 70; pointer-events: none; display: none; }
+  .fxcanvas.on { display: block; }
+  .fxbanner { position: absolute; left: 50%; top: 36%; z-index: 71; pointer-events: none;
+    transform: translate(-50%, -50%); text-align: center; white-space: nowrap;
+    font-size: 44px; font-weight: 900; letter-spacing: -.5px; opacity: 0; color: #fff;
+    text-shadow: 0 0 24px rgba(0,229,255,.75), 0 0 60px rgba(138,43,226,.65), 0 6px 30px rgba(0,0,0,.8); }
+  .fxbanner small { display: block; margin-top: 8px; font-size: 13px; letter-spacing: .22em;
+    text-transform: uppercase; color: #c2cde6; text-shadow: 0 2px 14px rgba(0,0,0,.8); }
+  .fxbanner.go { animation: fxpop 2s cubic-bezier(.2,1.4,.4,1) both; }
+  @keyframes fxpop {
+    0% { opacity: 0; transform: translate(-50%,-50%) scale(.4); }
+    12% { opacity: 1; transform: translate(-50%,-50%) scale(1.08); }
+    22% { transform: translate(-50%,-50%) scale(1); }
+    78% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%,-50%) scale(1.04); }
+  }
+
+  /* ---------- LIVE mode ---------- */
+  /* Matches the bar's #0b1019 exactly at its top edge — the old bright cyan
+     bloom right under the rule made the header look like a separate slab. Any
+     glow is kept low, well away from the seam. */
+  .live-view { position: absolute; top: var(--headerH, 74px); left: 0; right: 0; bottom: 0; z-index: 55; background:
+      radial-gradient(620px 460px at 50% 118%, rgba(138,43,226,.30) 0%, transparent 62%),
+      #0b1019; display: none; flex-direction: column; }
+  .live-view.open { display: flex; }
+  .live-inner { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: calc(12px + var(--sat)) 16px calc(14px + var(--sab)); }
+  .live-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .live-top .lt-title { font-weight: 900; font-size: 17px; }
+  .live-top .lt-sub { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .live-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 11px; min-height: 0; }
+  .scorestrip { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .scorestrip .sc { background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; font-weight: 800; font-size: 13px; }
+  .scorestrip .sc.lead { border-color: var(--yellow); }
+  .scorestrip .sc b { color: var(--cyan); margin-left: 3px; }
+  .live-foot { display: flex; gap: 10px; padding-top: 12px; }
+
+  .lcode { text-align: center; }
+  .lcode .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 800; }
+  .lcode .code { font-size: 46px; font-weight: 900; letter-spacing: 8px; margin: 4px 0; background: linear-gradient(90deg, var(--pink), var(--yellow)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .lqr { display: flex; justify-content: center; margin: 6px 0; }
+  .lqr img { width: 176px; height: 176px; image-rendering: pixelated; border-radius: 12px; border: 4px solid #fff; background: #fff; }
+  .players { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .ptag { background: var(--panel-2); border: 2px solid var(--line); border-radius: 999px; padding: 8px 14px; font-weight: 800; font-size: 13px; }
+  .ptag.host { border-color: var(--pink); }
+  .ptag.active { background: linear-gradient(135deg, var(--pink), var(--orange)); border-color: transparent; }
+
+  .lcard { background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 13px; }
+  .lcard h4 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .bigword { font-size: 27px; font-weight: 900; text-align: center; padding: 15px 12px; border-radius: 16px; color: #fff;
+    background: linear-gradient(155deg, var(--pink), var(--violet)); border: 3px solid rgba(255,255,255,.5); word-break: break-word; }
+  .bigletter { font-size: 66px; font-weight: 900; text-align: center; color: #fff; width: 92px; height: 92px; display: grid; place-items: center; margin: 0 auto;
+    border-radius: 20px; background: linear-gradient(135deg, var(--cyan), var(--violet)); border: 3px solid rgba(255,255,255,.5); }
+  .bigtimer { font-size: 40px; font-weight: 900; text-align: center; font-variant-numeric: tabular-nums; }
+  .bigtimer.warn { color: var(--yellow); } .bigtimer.done { color: var(--danger); }
+
+  .scatfield { margin-bottom: 10px; }
+  .scatfield label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 5px; color: var(--muted); }
+  .scatfield input { width: 100%; padding: 12px; border-radius: 11px; border: 2px solid var(--line); background: var(--panel-2); color: #fff; font-size: 16px; font-weight: 600; }
+  .scatfield input:focus { outline: none; border-color: var(--pink); }
+  .scatfield input.good { border-color: #43e97b; }
+
+  .revcat { border-top: 1px solid var(--line); padding: 10px 0; }
+  .revcat .rc-cat { font-weight: 800; margin-bottom: 6px; }
+  .revans { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 3px 0; }
+  .revans .who { color: var(--muted); font-weight: 700; min-width: 82px; }
+  .revans .ans { font-weight: 700; }
+  .revans .pt { margin-left: auto; font-weight: 800; }
+  .revans .pt.ok { color: #43e97b; } .revans .pt.no { color: var(--muted); }
+
+  .scoretable { display: flex; flex-direction: column; gap: 8px; }
+  .scoreitem { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 2px solid var(--line); border-radius: 12px; padding: 10px 13px; }
+  .scoreitem .nm { flex: 1; font-weight: 800; }
+  .scoreitem .pts { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .scoreitem.lead { border-color: var(--yellow); }
+
+  .drawwrap { position: relative; width: 100%; aspect-ratio: 1/1; max-width: min(320px, 40vh); margin: 0 auto; }
+  .drawcanvas { width: 100%; height: 100%; background: #fff; border-radius: 16px; border: 3px solid rgba(255,255,255,.5); touch-action: none; display: block; }
+  .drawtools { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+  .swatch { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255,255,255,.4); cursor: pointer; }
+  .swatch.sel { border-color: #fff; transform: scale(1.12); }
+
+  .live-view .btn.mini, .live-foot .btn { padding: 13px; font-size: 15px; }
+  .wizbtn { display: flex; flex-direction: column; gap: 3px; align-items: center; padding: 18px 12px; }
+  .wizbtn .wl { font-size: 18px; font-weight: 900; }
+  .wizbtn .ws { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .catchip { margin-top: 9px; border-radius: 12px; padding: 10px; font-weight: 900; font-size: 17px; color: #fff;
+    background: linear-gradient(155deg, var(--c1), var(--c2)); border: 2px solid rgba(255,255,255,.35); }
+  .lbl2 { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 800; }
+  .tsw { width: 20px; height: 20px; border-radius: 50%; flex: none; border: 2px solid #fff; background: linear-gradient(160deg, var(--t1), var(--t2)); }
+  .tname { flex: 1; min-width: 0; padding: 9px 11px; border-radius: 10px; border: 2px solid var(--line); background: var(--panel-2); color: #fff; font-size: 15px; font-weight: 800; }
+  .trow2 { display: flex; align-items: center; gap: 9px; padding: 7px 0; font-size: 14px; font-weight: 600; }
+  .ptag.tapme { cursor: pointer; border-color: var(--cyan); }
+  .ptag.tapme:active { transform: scale(.94); }
+  .codeinput { width: 100%; padding: 14px; border-radius: 13px; border: 2px solid var(--line); background: var(--panel-2); color: #fff; font-size: 22px; font-weight: 900; text-align: center; letter-spacing: 6px; text-transform: uppercase; caret-color: var(--cyan); }
+  /* Without this the OS draws its own focus ring, which follows the system
+     accent colour — gold on this Mac, nothing to do with the app's palette. */
+  /* ---- Join screen ---- */
+  .live-view.artbg { background: #0b1019; }
+  /* Animated backdrop, shown only on the join screen. The poster is the still
+     version, so a blocked autoplay (iOS Low Power Mode) degrades to the image. */
+  .joinbg { display: none; position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; object-position: center bottom; z-index: 0; }
+  .live-view.artbg .joinbg { display: block; }
+  /* The first stop is the app bar's own #0b1019 so there's no colour step where
+     the body meets the header; it fades to the artwork further down. */
+  .live-view.artbg::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.86) 22%, rgba(11,16,25,.45) 45%, rgba(11,16,25,0) 66%); }
+  .live-inner { position: relative; z-index: 2; }
+  .joinbody { justify-content: center; padding-bottom: 32%; overflow: hidden; }
+  .joincard { width: 100%; max-width: 330px; margin: 0 auto; display: flex; flex-direction: column;
+    align-items: center; text-align: center; }
+  .jointitle { margin: 0; font-size: 40px; font-weight: 900; letter-spacing: -1px; color: #fff;
+    text-shadow: 0 4px 26px rgba(0,0,0,.6); }
+  .joincard .tagrule { margin: 16px 0 20px; }
+  .joinsub { margin: 0 0 42px; font-size: 16px; font-weight: 700; line-height: 1.45; color: #c2cde6; }
+
+  /* Host and Join share this slot so both screens come out the same height and
+     their buttons land on the same line. Sized by Host, which is the taller of
+     the two (it carries the deck description) and fills it exactly — so
+     centring is a no-op there, and it just centres Join's code cells in the
+     space between the subtitle and the button. */
+  .jslot { width: 100%; min-height: 169px; display: flex; flex-direction: column; justify-content: center; }
+  .codewrap { position: relative; cursor: text; width: 100%; }
+  /* the real input is invisible but still focused, so the phone keyboard,
+     paste and autofill all behave normally */
+  .codeinput { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0;
+    border: 0; padding: 0; background: none; -webkit-text-fill-color: transparent; }
+  .codeinput:focus { outline: none; }
+  .codecells { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; pointer-events: none; }
+  /* gradient edge via padding-box/border-box, same trick as the home buttons */
+  .cc { aspect-ratio: 1 / 1.1; display: grid; place-items: center; border-radius: 16px;
+    font-size: 34px; font-weight: 900; color: #fff; border: 2px solid transparent;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(150deg, rgba(0,229,255,.35), rgba(138,43,226,.35)) border-box; }
+  .cc.filled { background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(150deg, var(--cyan), var(--violet)) border-box; }
+  .cc.next { background: linear-gradient(180deg, rgba(16,22,42,.95), rgba(10,14,30,.95)) padding-box,
+                linear-gradient(150deg, var(--cyan), var(--violet)) border-box;
+    box-shadow: 0 0 18px rgba(138,43,226,.35); }
+  .caret { display: block; width: 3px; height: 34px; border-radius: 2px; background: var(--cyan);
+    animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
+
+  /* Host screen: the deck picker sits where the code cells sit on Join, with
+     the chosen deck confirmed in a panel directly above it. */
+  /* Deck info sits above the picker as plain type, not another card — a second
+     bordered box directly above the dropdown just repeated the deck name. */
+  /* The block always occupies the same height — reserved even before a deck is
+     picked — so switching between a 2-line and a 3-line description never
+     shifts the dropdown and button underneath it. */
+  .deckinfo { width: 100%; margin-bottom: 20px; }
+  .di-blurb { margin: 0 0 12px; font-size: 14.5px; font-weight: 600; line-height: 1.5; color: #c2cde6;
+    height: calc(14.5px * 1.5 * 3); overflow: hidden;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+  /* explicit height: empty spans would otherwise collapse the row before a deck
+     is picked, and the block would grow by that much on first selection */
+  .di-stats { display: flex; align-items: center; justify-content: center; gap: 10px; height: 15px;
+    font-size: 11.5px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--cyan); }
+  .di-stats i { width: 4px; height: 4px; border-radius: 50%; background: var(--violet); }
+  .pickfield { position: relative; width: 100%; }
+  /* picker and the reveal button share a row; the eye stays square and pinned
+     to the top so a list opening below can't stretch it */
+  .pickrow { display: flex; align-items: flex-start; gap: 10px; }
+  .pickrow #menuPick { flex: 1; min-width: 0; }
+  .eyebtn { flex: none; width: 58px; height: 58px; appearance: none; cursor: pointer;
+    display: grid; place-items: center; border-radius: 16px; border: 2px solid transparent;
+    color: var(--cyan);
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(150deg, rgba(0,229,255,.55), rgba(138,43,226,.55)) border-box; }
+  .eyebtn svg { width: 25px; height: 25px; display: block;
+    filter: drop-shadow(0 0 6px rgba(0,229,255,.45)); }
+  .eyebtn:active { transform: scale(.95); }
+  .eyebtn:focus { outline: none; }
+  .eyebtn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  /* In the sheet the list sits in the flow and grows the section, rather than
+     floating over it — the section clips overflow for its rounded corners, so
+     an absolutely-positioned list was cut off after the first option. */
+  #menuPick .picklist { position: static; margin-top: 8px; max-height: 38vh; }
+  /* The field: icon pinned left, chevron pinned right, name centred between. */
+  .pickbtn { position: relative; width: 100%; appearance: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 17px 54px; border-radius: 16px; border: 2px solid transparent;
+    font-size: 16px; font-weight: 800; color: #fff;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(150deg, rgba(0,229,255,.55), rgba(138,43,226,.55)) border-box; }
+  .pickfield.open .pickbtn { background: linear-gradient(180deg, rgba(16,22,42,.96), rgba(10,14,30,.96)) padding-box,
+                linear-gradient(150deg, var(--cyan), var(--violet)) border-box; }
+  .pickbtn:focus { outline: none; }
+  .pickbtn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  /* Generate is styled as a picker field so the menu reads as one family */
+  .genbtn { margin-top: 4px; }
+  .genbtn:disabled { opacity: .6; }
+  .pick-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pick-ico { position: absolute; left: 17px; top: 50%; transform: translateY(-50%);
+    width: 25px; height: 25px; color: var(--cyan); pointer-events: none;
+    filter: drop-shadow(0 0 6px rgba(0,229,255,.45)); }
+  .pick-ico svg, .po-ico svg { width: 100%; height: 100%; display: block; }
+  .pick-chev { position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
+    width: 18px; height: 18px; color: var(--cyan); pointer-events: none; transition: transform .18s; }
+  .pickfield.open .pick-chev { transform: translateY(-50%) rotate(180deg); }
+
+  /* Themed option list — a native <select> popup is drawn by the OS and can't
+     be styled, which is why it looked out of place. */
+  .picklist { position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 30;
+    /* sized to fit under the field on a 393x852 phone — 46vh ran 59px off
+       the bottom of the screen */
+    max-height: 32vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding: 6px; border-radius: 16px; border: 2px solid transparent;
+    background: linear-gradient(180deg, #121a2c, #0a0e1c) padding-box,
+                linear-gradient(150deg, var(--cyan), var(--violet)) border-box;
+    box-shadow: 0 18px 44px rgba(0,0,0,.6); }
+  .picklist[hidden] { display: none; }
+  .pickopt { width: 100%; appearance: none; border: none; cursor: pointer; text-align: left;
+    display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 11px;
+    background: transparent; color: var(--ink); font-size: 15px; font-weight: 800; }
+  .pickopt + .pickopt { margin-top: 2px; }
+  .pickopt .po-ico { flex: none; width: 22px; height: 22px; color: var(--muted); }
+  .pickopt.on { background: rgba(0,229,255,.12); color: var(--cyan); }
+  .pickopt.on .po-ico { color: var(--cyan); }
+  .pickopt:active { background: rgba(0,229,255,.18); }
+
+  .joingo { margin-top: 40px; width: 100%; appearance: none; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    padding: 17px; border-radius: 999px; font-size: 19px; font-weight: 900; color: #fff;
+    background: linear-gradient(100deg, var(--cyan), #6a5bff 55%, #c840ff);
+    box-shadow: 0 10px 34px rgba(106,91,255,.45), 0 0 22px rgba(0,229,255,.25); }
+  .joingo svg { width: 21px; height: 21px; }
+  .joingo:active { transform: translateY(2px); }
+  .joingo:disabled { opacity: .45; box-shadow: none; cursor: default; }
+
+
+  .lhint { text-align: center; color: var(--muted); font-weight: 600; font-size: 13px; line-height: 1.5; }
+
+  /* ---------- Game screens ----------
+     Lobby → teams → play → control → result, in the same language as the Host
+     and Join screens. Solo and live run the identical screens; solo just skips
+     the lobby, so anything room-specific here is what live adds on top. */
+  /* A category-coloured glow behind the heading was tried here and looked like
+     a grey slab on the silver control screens — the word card and ring carry
+     the category colour on their own, so the backdrop stays plain. */
+  .live-view.game { background:
+      radial-gradient(620px 460px at 50% 118%, rgba(138,43,226,.26) 0%, transparent 62%),
+      #0b1019; }
+  /* The Host/Join animated backdrop appears on selected game screens only —
+     the solo team setup and the winners page — via the "vid" class, under a
+     slightly stronger veil so cards and buttons stay legible. Mid-game turns
+     stay on the plain backdrop so the word is the loudest thing on screen. */
+  .live-view.vid .joinbg { display: block; }
+  .live-view.vid::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%,
+      rgba(11,16,25,.62) 44%, rgba(11,16,25,.34) 100%); }
+  .gs { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .gs-head { flex: none; text-align: center; margin-bottom: 16px; }
+  .gs-title { margin: 0; font-size: 29px; font-weight: 900; letter-spacing: -.6px; color: #fff;
+    text-shadow: 0 4px 26px rgba(0,0,0,.6); }
+  .gs-head .tagrule { margin: 13px auto 0; }
+  .gs-sub { margin: 12px 0 0; font-size: 14px; font-weight: 700; color: #b3c0da; }
+  /* Long screens (lobby, teams) scroll from the top; short ones centre. Centring
+     an overflowing column clips its head, so it's opt-in rather than default. */
+  /* overflow-x hidden: the rotated "wins!" pokes past the column's box, and the
+     resulting horizontal scrollbar drew a grey line across the result screen */
+  .gs-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    display: flex; flex-direction: column; gap: 14px; }
+  /* Centred screens sit a touch high, like Host and Join — dead centre leaves a
+     matching void above and below and both read as accidental. */
+  .gs-body.mid { justify-content: center; justify-content: safe center;
+    padding-bottom: clamp(0px, 9vh, 96px); }
+  .gs-body.mid .gs-head { margin-bottom: 6px; }
+  .gs-foot { flex: none; display: flex; gap: 10px; padding-top: 16px; }
+
+  /* Panel — the same gradient hairline as the pickers and code cells. */
+  .gpanel { border-radius: 18px; border: 2px solid transparent; padding: 15px;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(150deg, rgba(0,229,255,.35), rgba(138,43,226,.35)) border-box; }
+  .gpanel > h4 { margin: 0 0 12px; font-size: 10.5px; font-weight: 900; letter-spacing: .16em;
+    text-transform: uppercase; color: #7f8db0; text-align: center; }
+
+  /* One bar says it all: the active team is the loud named pill with its board
+     position; the other teams collapse to a coloured dot + position. The board
+     on the TV carries the full scoreboard, so the phone stays quiet. */
+  .teamsbar { display: flex; align-items: center; justify-content: center; gap: 8px;
+    flex-wrap: wrap; }
+  .tb { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px;
+    padding: 8px 13px; border: 2px solid transparent; opacity: .72;
+    font-size: 13px; font-weight: 800; color: #c2cde6;
+    background: linear-gradient(180deg, rgba(12,17,32,.9), rgba(8,11,24,.9)) padding-box,
+                linear-gradient(140deg, var(--t1), var(--t2)) border-box; }
+  .tb i { width: 11px; height: 11px; border-radius: 50%; flex: none;
+    background: linear-gradient(160deg, var(--t1), var(--t2)); }
+  .tb b { color: #fff; font-variant-numeric: tabular-nums; }
+  .tb.on { opacity: 1; padding: 11px 17px; font-size: 15px;
+    background: linear-gradient(180deg, rgba(12,17,32,.94), rgba(8,11,24,.94)) padding-box,
+                linear-gradient(120deg, var(--t1), var(--t2)) border-box;
+    box-shadow: 0 0 18px -4px var(--t1); }
+  .tb.on i { width: 13px; height: 13px; box-shadow: 0 0 10px var(--t1); }
+  .tb.on b { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tb.on small { font-size: 12px; font-weight: 800; color: #8b99b8;
+    letter-spacing: .06em; }
+
+  /* Countdown ring — reads at arm's length across the room. */
+  .ring { position: relative; width: 154px; height: 154px; margin: 0 auto; flex: none; }
+  .ring svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+  .ring .trk { fill: none; stroke: rgba(255,255,255,.08); stroke-width: 9; }
+  /* Brand-gradient sweep — the category colour lives on the word card, so the
+     clock stays the same jewel on every turn. The glow is a round box-shadow
+     on the container, NOT a drop-shadow filter on the arc: the filter promoted
+     a compositing layer whose square bounds showed as a faint slab. */
+  .ring .prg { fill: none; stroke: url(#ringGrad); stroke-width: 9; stroke-linecap: round;
+    transition: stroke-dashoffset .32s linear, stroke .3s; }
+  .ring::before { content: ""; position: absolute; inset: 5px; border-radius: 50%;
+    box-shadow: 0 0 26px rgba(138,43,226,.4), 0 0 46px rgba(0,229,255,.16),
+                inset 0 0 24px rgba(138,43,226,.22); }
+  .ring.idle::before { box-shadow: none; }
+  .ring.warn .prg { stroke: var(--yellow); }
+  .ring.warn::before { box-shadow: 0 0 26px rgba(255,209,0,.35), inset 0 0 24px rgba(255,209,0,.14); }
+  .ring.done .prg { stroke: var(--danger); }
+  .ring.done::before { box-shadow: 0 0 26px rgba(255,45,85,.4), inset 0 0 24px rgba(255,45,85,.18); }
+  .ring .num { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .ring .num b { font-size: 45px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .ring .num small { display: block; margin-top: 5px; font-size: 9.5px; font-weight: 900;
+    letter-spacing: .16em; text-transform: uppercase; color: #7f8db0; }
+  .ring.warn .num b { color: var(--yellow); }
+  .ring.done .num b { color: var(--danger); }
+  .ring.idle .prg { display: none; }
+
+  /* One pip per correct answer = one space on the board. */
+  .tally { display: flex; align-items: center; justify-content: center; gap: 7px; flex-wrap: wrap;
+    min-height: 12px; }
+  .tally .pip { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.13); }
+  .tally .pip.on { background: linear-gradient(160deg, var(--pink), var(--violet));
+    box-shadow: 0 0 10px rgba(255,47,208,.6); animation: pippop .35s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes pippop { 0% { transform: scale(.2); } 60% { transform: scale(1.5); } 100% { transform: scale(1); } }
+
+  /* The word itself, in its category's colours. Text uses the category's own ink
+     so yellow and cyan cards stay readable instead of white-on-bright. */
+  .wordcard { border-radius: 22px; padding: 24px 16px; text-align: center;
+    background: linear-gradient(155deg, var(--c1), var(--c2)); color: var(--ink, #fff);
+    box-shadow: 0 18px 44px rgba(0,0,0,.45); }
+  .wordcard .cat { display: inline-block; padding: 5px 14px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase;
+    background: rgba(0,0,0,.22); }
+  .wordcard .w { margin: 14px 0 0; font-size: 31px; font-weight: 900; line-height: 1.15;
+    word-break: break-word; }
+  .wordcard .v { margin-top: 10px; font-size: 11px; font-weight: 800; letter-spacing: .12em;
+    text-transform: uppercase; opacity: .6; }
+  .wordcard.quiet { background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92));
+    border: 2px solid transparent; color: #fff; box-shadow: none;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(150deg, var(--c1), var(--c2)) border-box; }
+  .wordcard.quiet .cat { background: linear-gradient(120deg, var(--c1), var(--c2)); color: var(--ink,#fff); }
+  .wordcard.quiet .w { font-size: 26px; }
+
+  /* A Draw turn carries a canvas as well, which pushed the ring off the top and
+     the canvas off the bottom. Everything else shrinks so the whole turn fits
+     without scrolling — you can't go hunting for the clock mid-sketch. */
+  /* the fit is exact, so no scrolling and none of .mid's bottom bias —
+     with them the screen overflowed by its own padding and scrolled */
+  .gs.draw .gs-body { gap: 10px; padding-bottom: 0; overflow-y: hidden; }
+  .gs.draw .ring { width: 92px; height: 92px; }
+  .gs.draw .ring .num b { font-size: 30px; }
+  .gs.draw .ring .num small { display: none; }
+  .gs.draw .ring .trk, .gs.draw .ring .prg { stroke-width: 12; }
+  .gs.draw .wordcard { padding: 13px 14px; }
+  .gs.draw .wordcard .w { margin-top: 9px; font-size: 23px; }
+  .gs.draw .wordcard .v { display: none; }
+  .gs.draw .gpanel { padding: 11px; }
+  .gs.draw .drawwrap { max-width: min(320px, 31vh); }
+
+  /* Buttons: one gradient pill per screen, ghosts for the rest. */
+  .gbtn { flex: 1; appearance: none; border: none; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; gap: 10px; padding: 17px;
+    border-radius: 999px; font-size: 18px; font-weight: 900; color: #fff;
+    background: linear-gradient(100deg, var(--cyan), #6a5bff 55%, #c840ff);
+    box-shadow: 0 10px 34px rgba(106,91,255,.42), 0 0 22px rgba(0,229,255,.22); }
+  .gbtn svg { width: 20px; height: 20px; flex: none; }
+  .gbtn:active { transform: translateY(2px); }
+  .gbtn:disabled { opacity: .45; box-shadow: none; cursor: default; transform: none; }
+  .gbtn.ghost { flex: none; padding: 17px 20px; font-size: 15px; box-shadow: none;
+    border: 2px solid transparent; color: #c2cde6;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(150deg, rgba(0,229,255,.4), rgba(138,43,226,.4)) border-box; }
+  .gbtn.wait { background: linear-gradient(180deg, rgba(12,17,32,.9), rgba(8,11,24,.9));
+    border: 2px dashed rgba(255,255,255,.16); color: #7f8db0; font-size: 15px;
+    box-shadow: none; cursor: default; }
+  .gbtn.wait:active { transform: none; }
+
+  /* Team setup */
+  .tcount { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tcount button { appearance: none; cursor: pointer; padding: 14px 0; border-radius: 14px;
+    border: 2px solid transparent; font-size: 17px; font-weight: 900; color: #fff;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(150deg, rgba(0,229,255,.3), rgba(138,43,226,.3)) border-box; }
+  .tcount button.on { color: var(--cyan);
+    background: linear-gradient(180deg, rgba(16,22,42,.96), rgba(10,14,30,.96)) padding-box,
+                linear-gradient(150deg, var(--cyan), var(--violet)) border-box;
+    box-shadow: 0 0 20px rgba(138,43,226,.28); }
+  .tcard { border-radius: 18px; border: 2px solid transparent; padding: 13px;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(140deg, var(--t1), var(--t2)) border-box; }
+  .tcard-h { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
+  .tcard .tname { border: none; background: rgba(255,255,255,.05); }
+  .tmem { display: flex; flex-wrap: wrap; gap: 7px; }
+  .tmem .who { border-radius: 999px; padding: 8px 13px; font-weight: 800; font-size: 13px;
+    border: 2px solid transparent; cursor: pointer; color: #fff;
+    background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03)) padding-box,
+                linear-gradient(150deg, var(--t1), var(--t2)) border-box; }
+  .tmem .who:active { transform: scale(.94); }
+  .tmem .who.bot { color: #b6c3de; }
+  .tmem .none { font-size: 12.5px; font-weight: 700; color: #6f7d9e; padding: 8px 2px; }
+
+  /* Room code, shown in the very cells the joining player types into. */
+  .roomcode { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; }
+  .roomcode span { aspect-ratio: 1 / 1.1; display: grid; place-items: center; border-radius: 16px;
+    font-size: 34px; font-weight: 900; color: #fff; border: 2px solid transparent;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(150deg, var(--cyan), var(--violet)) border-box; }
+  .qrbox { display: flex; justify-content: center; }
+  .qrbox img { width: 168px; height: 168px; image-rendering: pixelated; border-radius: 14px;
+    border: 7px solid #fff; background: #fff; }
+  .whos { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .whos .who { border-radius: 999px; padding: 8px 14px; font-weight: 800; font-size: 13px;
+    border: 2px solid transparent; color: #dbe4f5;
+    background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)) padding-box,
+                linear-gradient(150deg, rgba(0,229,255,.4), rgba(138,43,226,.4)) border-box; }
+  .whos .who.me { color: var(--cyan);
+    background: linear-gradient(180deg, rgba(0,229,255,.1), rgba(138,43,226,.08)) padding-box,
+                linear-gradient(150deg, var(--cyan), var(--violet)) border-box; }
+
+  /* Result */
+  .winner { text-align: center; }
+  .winner .cup { width: 74px; height: 74px; margin: 0 auto 12px; color: var(--yellow);
+    filter: drop-shadow(0 0 18px rgba(255,209,0,.5)); }
+  .winner .cup svg { width: 100%; height: 100%; display: block; }
+  .winner .nm { font-size: 34px; font-weight: 900; letter-spacing: -.5px;
+    background: linear-gradient(100deg, var(--cyan), #c840ff); -webkit-background-clip: text;
+    background-clip: text; -webkit-text-fill-color: transparent; }
+  .winner .wins { margin-top: 2px; font-size: 25px; font-weight: 900; font-style: italic;
+    letter-spacing: .02em; transform: rotate(-3deg); color: var(--yellow);
+    text-shadow: 0 0 18px rgba(255,209,0,.55); }
+  .standings { display: flex; flex-direction: column; gap: 9px; }
+  .strow { display: flex; align-items: center; gap: 11px; border-radius: 14px; padding: 11px 14px;
+    border: 2px solid transparent; font-weight: 800;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(140deg, var(--t1), var(--t2)) border-box; }
+  /* podium medals: gold, silver, bronze, then slate */
+  .strow .medal { flex: none; width: 27px; height: 27px; border-radius: 50%; display: grid;
+    place-items: center; font-size: 13px; font-weight: 900; color: #1a1200;
+    background: linear-gradient(160deg, #ffe873, #e08700); box-shadow: 0 0 10px rgba(255,209,0,.35); }
+  .strow:nth-child(2) .medal { background: linear-gradient(160deg, #e8edf5, #97a3b8);
+    color: #1c2230; box-shadow: none; }
+  .strow:nth-child(3) .medal { background: linear-gradient(160deg, #e2a05e, #8a5220);
+    color: #241100; box-shadow: none; }
+  .strow:nth-child(n+4) .medal { background: linear-gradient(160deg, #566078, #2a3242);
+    color: #c2cde6; box-shadow: none; }
+  .strow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .strow .pos { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .strow.first .pos { color: var(--yellow); }
+
+  /* little twinkles beside "You're up!" */
+  .spark { display: inline-block; font-size: .55em; vertical-align: .28em; color: var(--pink);
+    text-shadow: 0 0 10px rgba(255,47,208,.8); animation: twinkle 1.6s ease-in-out infinite; }
+  .spark:last-child { animation-delay: -.8s; }
+  @keyframes twinkle { 0%,100% { opacity: .45; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+
+  /* Control turn (spade / finish) — silver, matching the board's white spaces. */
+  .gs.ctrl .gpanel { background: linear-gradient(180deg, rgba(20,26,42,.94), rgba(10,14,28,.94)) padding-box,
+                linear-gradient(150deg, rgba(242,246,255,.6), rgba(201,214,238,.4)) border-box; }
+  .awards { display: flex; flex-direction: column; gap: 9px; }
+  .awardbtn { width: 100%; appearance: none; cursor: pointer; display: flex; align-items: center;
+    gap: 11px; padding: 14px; border-radius: 14px; border: 2px solid transparent;
+    font-size: 15px; font-weight: 900; color: #fff; text-align: left;
+    background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
+                linear-gradient(140deg, var(--t1), var(--t2)) border-box; }
+  .awardbtn i { width: 13px; height: 13px; border-radius: 50%; flex: none;
+    background: linear-gradient(160deg, var(--t1), var(--t2)); box-shadow: 0 0 9px var(--t1); }
+  .awardbtn span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .awardbtn small { font-size: 11px; font-weight: 800; color: #7f8db0; flex: none; }
+  .awardbtn:active { transform: scale(.98); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="brand" id="homeBtn">
+      <img class="logo" src="./wordsmash-mark.png" alt="Word Smash" />
+    </div>
+    <div class="grow"></div>
+    <button class="iconbtn ring" id="settingsBtn" title="Menu" aria-label="Menu"><img class="ico" src="./ico-settings.png" width="24" height="24" decoding="sync" loading="eager" fetchpriority="high" alt="Menu" /></button>
+    <button class="iconbtn close" id="headerClose" title="Close" aria-label="Close" hidden></button>
+  </header>
+  <!-- Screen name sits under the rule, full width, instead of squeezed into the bar -->
+  <div class="pagehead" id="pageHead" hidden></div>
+  <div class="subhead" id="deckSub" style="display:none;"></div>
+
+  <main class="stage">
+
+    <div class="empty" id="empty" style="display:none;">
+      <video class="homebg" id="heroVideo" src="./home-bg.webm" poster="./home-bg.jpg"
+             autoplay muted loop playsinline disablepictureinpicture preload="auto"
+             aria-label="Word Smash. Sketch, shout, score."></video>
+      <div class="homeveil" aria-hidden="true"></div>
+      <div class="tagblock">
+        <p class="tagline">Think fast. Talk faster.</p><!-- uppercased in CSS -->
+        <div class="tagrule"><span></span><i></i><span></span></div>
+      </div>
+      <div class="home-actions">
+        <button class="btn homebtn" id="emptyHost">
+          <span class="hb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8.5 9h7a5.2 5.2 0 0 1 5.1 4.2l.35 2.1a2.5 2.5 0 0 1-4.6 1.7L15 15H9l-1.35 2a2.5 2.5 0 0 1-4.6-1.7l.35-2.1A5.2 5.2 0 0 1 8.5 9Z"/>
+            <path d="M7.6 11.9v2.2"/><path d="M6.5 13h2.2"/>
+            <circle cx="15.6" cy="12.5" r="1" fill="currentColor" stroke="none"/>
+            <circle cx="17.5" cy="14.3" r="1" fill="currentColor" stroke="none"/>
+          </svg></span>
+          <span class="hb-txt"><b>Host a game</b><small>Create a game and invite friends</small></span>
+          <span class="hb-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 4 8 8-8 8"/></svg></span>
+        </button>
+        <button class="btn homebtn" id="emptyJoin">
+          <span class="hb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6.5" y="2.6" width="11" height="18.8" rx="3"/>
+            <path d="M10.6 5.7h2.8"/>
+            <circle cx="12" cy="18.1" r="1" fill="currentColor" stroke="none"/>
+          </svg></span>
+          <span class="hb-txt"><b>Join a game</b><small>Enter a code and join the fun</small></span>
+          <span class="hb-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 4 8 8-8 8"/></svg></span>
+        </button>
+        <button class="btn homebtn" id="emptySolo">
+          <span class="hb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="8.6" cy="7.6" r="3.1"/>
+            <path d="M2.9 19.4a5.7 5.7 0 0 1 11.4 0"/>
+            <path d="M16.9 4.6h4.4v4.4"/><path d="m21.3 4.6-4.9 4.9"/>
+            <circle cx="18.1" cy="16.4" r="2.4"/>
+          </svg></span>
+          <span class="hb-txt"><b>Solo game</b><small>Play against bots, no one else needed</small></span>
+          <span class="hb-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 4 8 8-8 8"/></svg></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" style="display:none;"></div>
+  </main>
+
+  <div class="scrim" id="cardsScrim"></div>
+  <div class="cardspop" id="gridView">
+    <div class="cardspop-head">
+      <div class="cph-txt"><b id="cardsTitle"></b><small id="cardsSub"></small></div>
+      <button class="iconbtn close" id="cardsClose" aria-label="Close"></button>
+    </div>
+    <div class="grid-scroll" id="gridScroll"></div>
+  </div>
+
+
+
+  <div class="flash" id="flash"></div>
+  <canvas class="fxcanvas" id="fxCanvas"></canvas>
+  <div class="fxbanner" id="fxBanner"></div>
+
+  <div class="live-view" id="liveView">
+    <video class="joinbg" id="joinBg" src="./join-bg.webm" poster="./join-bg.jpg"
+           muted loop playsinline preload="auto" aria-hidden="true"></video>
+    <div class="live-inner" id="liveInner"></div>
+  </div>
+
+  <div class="install" id="installBanner">
+    <div class="txt" id="installTxt"></div>
+    <button class="btn sm" id="installBtn" style="width:auto;">Install</button>
+    <span class="x" id="installX">✕</span>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet">
+    <div class="handle"></div>
+
+    <details class="sect" id="decksSect">
+      <summary><span class="sglabel"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3.4" width="11" height="15" rx="2.6"/><path d="M6.4 6.6 4.5 7.4a2 2 0 0 0-1.1 2.6l3.3 8.2a2 2 0 0 0 2.6 1.1l2-.8"/></svg></span>Decks</span><span class="chev">›</span></summary>
+      <div class="sect-body">
+        <div class="pickrow">
+          <div id="menuPick"></div>
+          <button class="eyebtn" id="menuPickGo" aria-label="See all cards" title="See all cards">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2.6 12S6 5.4 12 5.4 21.4 12 21.4 12 18 18.6 12 18.6 2.6 12 2.6 12Z"/><circle cx="12" cy="12" r="3.1"/>
+            </svg>
+          </button>
+        </div>
+        <div id="cloudList" hidden></div>
+      </div>
+    </details>
+
+
+    <details class="sect" id="createSect">
+      <summary><span class="sglabel"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2l1.5 3.9 3.9 1.5-3.9 1.5L12 14l-1.5-3.9L6.6 8.6l3.9-1.5z"/><path d="M18.4 14.6l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span>Create a new deck</span><span class="chev">›</span></summary>
+      <div class="sect-body">
+        <div class="field">
+          <label for="brief">What kind of cards do you want?</label>
+          <textarea id="brief" rows="4" placeholder="Describe the deck and who's playing, e.g. Aussie crew in our 40s, big on 80s and 90s movies, music and arcade games."></textarea>
+        </div>
+        <div class="two">
+          <div class="field">
+            <label for="difficulty">Difficulty</label>
+            <select id="difficulty">
+              <option value="easy">Easy</option>
+              <option value="mixed" selected>Mixed</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="audience">Audience</label>
+            <select id="audience">
+              <option value="family friendly">Family friendly</option>
+              <option value="teens">Teens</option>
+              <option value="adults (clean)" selected>Adults (clean)</option>
+              <option value="adults (spicy)">Adults (spicy)</option>
+            </select>
+          </div>
+        </div>
+        <button class="pickbtn genbtn" id="generateBtn">
+          <span class="pick-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3.2l1.5 3.9 3.9 1.5-3.9 1.5L12 14l-1.5-3.9L6.6 8.6l3.9-1.5z"/>
+            <path d="M18.4 14.6l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>
+          </svg></span>
+          <span class="pick-label" id="genStatus">Generate deck</span>
+          <span class="pick-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></span>
+        </button>
+      </div>
+    </details>
+
+    <button class="sectbtn" id="resetBtn">
+      <span class="sglabel"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 12a8.2 8.2 0 1 1-2.7-6.1"/><path d="M20.4 3.6v4.9h-4.9"/></svg></span>Reset game</span><span class="chev">›</span>
+    </button>
+    <div class="confirm-row" id="resetConfirm" hidden>
+      <span class="ctxt">Clear the current deck and go back to the home screen?</span>
+      <div class="cbtns">
+        <button class="btn sm" id="resetCancel">Cancel</button>
+        <button class="btn sm danger" id="resetYes">Reset game</button>
+      </div>
+    </div>
+
+    <details class="sect" id="keyDetails">
+      <summary><span class="sglabel"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="4.3"/><path d="M12.1 12.1 20.4 20.4"/><path d="M16.6 16.6l1.9-1.9"/><path d="M18.8 18.8l1.6-1.6"/></svg></span>AI key</span><span class="chev">›</span></summary>
+      <div class="sect-body">
+        <div class="field">
+          <label for="apiKey">OpenRouter key</label>
+          <input type="password" id="apiKey" placeholder="sk-or-v1-..." autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="model">Model</label>
+          <select id="model">
+            <optgroup label="Most popular">
+              <option value="xiaomi/mimo-v2.5">MiMo-V2.5 · Xiaomi</option>
+              <option value="deepseek/deepseek-v4-flash" selected>DeepSeek V4 Flash</option>
+              <option value="tencent/hy3">Hy3 · Tencent</option>
+              <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro</option>
+              <option value="z-ai/glm-5.2">GLM 5.2 · Z.ai</option>
+              <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra · NVIDIA (free)</option>
+              <option value="minimax/minimax-m3">MiniMax M3</option>
+              <option value="stepfun/step-3.7-flash">Step 3.7 Flash · StepFun</option>
+              <option value="moonshotai/kimi-k3">Kimi K3 · Moonshot</option>
+              <option value="inclusionai/ling-3.0-flash:free">Ling-3.0-flash (free)</option>
+            </optgroup>
+            <optgroup label="Free">
+              <option value="openai/gpt-oss-20b:free">gpt-oss-20b · OpenAI (free)</option>
+              <option value="google/gemma-4-26b-a4b-it:free">Gemma 4 26B · Google (free)</option>
+              <option value="nvidia/nemotron-3-super-120b-a12b:free">Nemotron 3 Super · NVIDIA (free)</option>
+              <option value="nvidia/nemotron-nano-9b-v2:free">Nemotron Nano 9B · NVIDIA (free)</option>
+              <option value="cohere/north-mini-code:free">North Mini Code · Cohere (free)</option>
+            </optgroup>
+            <option value="__custom">Custom…</option>
+          </select>
+          <input type="text" id="modelCustom" placeholder="author/model-slug" autocomplete="off"
+                 spellcheck="false" style="display:none;margin-top:8px" />
+        </div>
+      </div>
+    </details>
+
+    <!-- No Generate / Add more / Close down here: generating lives in the Host
+         flow ("Generate a new deck with AI"), and the app bar's ✕ closes this. -->
+  </div>
+</div>
+
+<script src="./qr.js"></script>
+<script src="./wordsmash.js"></script>
+<script src="./decks.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
+const LS_KEY = "masgames_or_key", LS_MODEL = "masgames_or_model", LS_DECK = "masgames_deck", LS_GROUP = "masgames_group";
+const DEFAULT_GROUP = "Aussie crew, all born in the early 1980s. We grew up on Australian culture plus the American movies, TV, music and games of the '80s and '90s, and still love American pop culture. Lean into that shared nostalgia.";
+
+// A card is painted in its own board category's colours — PERSON yellow, DRAW
+// purple, OBJECT cyan and so on — so the card in your hand matches the space
+// you're on. Falls back to the old palette only for cards with no known badge.
+function catPal(card, i) {
+  const C = (window.WORDSMASH && window.WORDSMASH.CATEGORIES) || {};
+  const k = String((card && card.badge) || "").toUpperCase();
+  if (C[k]) return [C[k].c1, C[k].c2, C[k].ink];
+  const p = PALETTES[i % PALETTES.length];
+  return [p[0], p[1], "#fff"];
+}
+const PALETTES = [
+  ["#00E5FF","#8A2BE2"], ["#8A2BE2","#4361ee"], ["#00FFC6","#0891b2"],
+  ["#FFD100","#ff7a1a"], ["#00E5FF","#0077ff"], ["#8A2BE2","#c81d6b"],
+  ["#FFD100","#8A2BE2"], ["#00FFC6","#00E5FF"], ["#5468ff","#8A2BE2"],
+];
+
+let deck = [], idx = 0;
+let deckGame = localStorage.getItem("masgames_deckgame") || "";
+function setDeckGame(g) { deckGame = g || ""; localStorage.setItem("masgames_deckgame", deckGame); }
+function inferGame(cards) {
+  if (!Array.isArray(cards) || !cards.length) return "gutterhead";
+  const c = cards[0], noTitle = !(c.title && c.title.trim()), n = Array.isArray(c.lines) ? c.lines.length : 0;
+  if (noTitle && n >= 10) return "scattergories";
+  if (noTitle && n === 6) return "articulate";
+  return "gutterhead";
+}
+
+// ▼▼▼ CLOUD: set this to your deployed Cloudflare Worker URL ▼▼▼
+//   e.g. "https://masgames-api.yourname.workers.dev"
+const API_BASE = "https://REPLACE-ME.workers.dev";
+// ▲▲▲  Until you set it, cloud save / share / library stay off (the app still works). ▲▲▲
+const cloudOn = () => /^https?:\/\//.test(API_BASE) && !/REPLACE-ME/.test(API_BASE);
+
+// anonymous device id — ties "My decks" to this browser
+let userId = localStorage.getItem("masgames_uid");
+if (!userId) { userId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2)); localStorage.setItem("masgames_uid", userId); }
+
+// ---------- persistence ----------
+$("apiKey").value = localStorage.getItem(LS_KEY) || "";
+// Model can be one of the listed 15 or a slug typed in by hand. currentModel()
+// is the single source of truth; the stored value is always the real slug.
+function syncModelCustom() {
+  const custom = $("model").value === "__custom";
+  $("modelCustom").style.display = custom ? "block" : "none";
+  if (custom) $("modelCustom").focus();
+}
+function currentModel() {
+  const v = $("model").value;
+  return (v === "__custom" ? ($("modelCustom").value || "").trim() : v) || DEFAULT_MODEL;
+}
+(function initModel() {
+  const sel = $("model"), saved = localStorage.getItem(LS_MODEL);
+  if (saved && ![...sel.options].some(o => o.value === saved)) {
+    // a slug we don't list — treat it as the custom entry rather than dropping it
+    sel.value = "__custom";
+    $("modelCustom").value = saved;
+  } else {
+    sel.value = saved || DEFAULT_MODEL;
+  }
+  syncModelCustom();
+})();
+$("modelCustom").addEventListener("input", () => { const m = currentModel(); if (m) localStorage.setItem(LS_MODEL, m); });
+$("model").addEventListener("change", () => { syncModelCustom(); localStorage.setItem(LS_MODEL, currentModel()); });
+
+function saveDeck() { localStorage.setItem(LS_DECK, JSON.stringify({ title: $("deckSub").textContent, cards: deck })); }
+// Shows the current deck name under the header. Hidden when there's no deck —
+// the logo already carries the brand, so no tagline needed here.
+// ---------- persistent header title ----------
+// #deckSub is a hidden store for the current deck's name (other code reads it).
+// #pageHead is what the user sees under the rule: the overlay name if one is
+// open, otherwise the deck name.
+let overlayTitle = "";
+function setDeckSub(t){ $("deckSub").textContent = t || ""; renderPageTitle(); }
+function setPageTitle(t){ overlayTitle = t || ""; renderPageTitle(); }
+function renderPageTitle(){
+  // The join/host screens carry their own hero heading and ask for no page
+  // title. Without this the deck-name fallback still rendered one, adding 46px
+  // to --headerH and knocking those screens out of alignment with each other.
+  // Only an open overlay names the page. There used to be a fallback to the
+  // selected deck's name, from when a loaded deck had its own screen — with
+  // that screen gone it just stamped the deck name over the home screen.
+  const bare = $("liveView").classList.contains("artbg");
+  const t = bare ? "" : overlayTitle;
+  $("pageHead").textContent = t;
+  $("pageHead").hidden = !t;
+  syncHomeMark(); syncHeaderHeight();
+}
+// One close button lives in the app bar next to the menu; whichever overlay is
+// open registers what it should do. Keeps every screen's chrome identical.
+let headerCloseFn = null;
+function setHeaderClose(fn){
+  headerCloseFn = typeof fn === "function" ? fn : null;
+  $("headerClose").hidden = !headerCloseFn;
+}
+window.setHeaderClose = setHeaderClose;
+// The small header mark is hidden only on the bare home screen (the big hero
+// logo is the branding there). Everywhere else it shows and doubles as "home".
+function syncHomeMark(){
+  // The join screen carries its own big heading so it sets no page title — but
+  // it is emphatically not the home screen, so check the live view too or the
+  // header mark and rule disappear there.
+  // Home is home whether or not a deck is selected — selecting one no longer
+  // opens anything, so it must not bring back the header mark or the rule.
+  const onHome = !overlayTitle && !$("liveView").classList.contains("open");
+  // The join screen has its own hero heading, so it drops the mark and rule too
+  // — and the in-game screens carry theirs, so they go bare the same way
+  const lv = $("liveView").classList;
+  const bare = onHome || lv.contains("artbg") || lv.contains("game");
+  $("homeBtn").style.display = bare ? "none" : "";
+  document.body.classList.toggle("chrome-bare", bare);
+  document.body.classList.toggle("is-home", onHome);   // home-only background
+}
+// Keep overlays clear of the app bar
+function syncHeaderHeight(){
+  const ph = $("pageHead");
+  const h = document.querySelector("header.bar").offsetHeight
+          + (ph && !ph.hidden ? ph.offsetHeight : 0);
+  document.documentElement.style.setProperty("--headerH", h + "px");
+}
+window.addEventListener("resize", syncHeaderHeight);
+window.addEventListener("orientationchange", syncHeaderHeight);
+
+// ---------- prompt ----------
+// Deck size is derived, not a setting. A 48-space board, 1 space per correct
+// answer, 4 teams: the winner burns ~48 and the others ~30 each, so a game runs
+// ~40 turns. At ~5 correct plus ~2 skips per 30s turn that's ~280 words drawn,
+// spread over 7 categories. 210 (30 per category) covers a full game with room
+// to skip; the pool wraps after that rather than running dry.
+const DECK_TARGET = 210, DECK_BATCH = 105;   // 2 calls — one 210-item response truncates
+const FORMAT_SPEC = `Word Smash cards. Each card is ONE word/phrase tagged with a board category. Set "badge" to exactly one of: OBJECT, NATURE, ACTION, PERSON, WORLD, RANDOM, DRAW. Set "title" to the word/phrase to describe out loud (for DRAW, something drawable). Leave "lines" empty and "note" empty. sizeHint = "md". Spread the cards EVENLY across all 7 categories. The board pulls from each, so a thin category means repeated words.`;
+function buildPrompt(cfg) {
+  let p = `Generate ${cfg.count} unique party game cards.\n\nFORMAT RULES: ${FORMAT_SPEC}\n`;
+  if (cfg.groupProfile) p += `PLAYER GROUP (tailor every card so it lands for these people): ${cfg.groupProfile}\n`;
+  p += `BRIEF: ${cfg.brief || "general. Draw on the player group's shared culture and nostalgia"}\n`;
+  p += `AUDIENCE: ${cfg.audience}\nDIFFICULTY: ${cfg.difficulty}\n`;
+  if (cfg.avoid && cfg.avoid.length) p += `Do NOT repeat these already-used titles: ${cfg.avoid.join("; ")}\n`;
+  p += `\nReturn ONLY this JSON, minified, with no markdown fences and no commentary:\n`;
+  p += `{"deckTitle":"short punchy name","cards":[{"badge":"","title":"","lines":[],"note":"","sizeHint":"md"}]}\n`;
+  p += `Every card MUST have a non-empty title. Make them fresh, varied and genuinely on-brief.`;
+  return p;
+}
+
+// ---------- OpenRouter call ----------
+async function callAI(cfg) {
+  const key = ($("apiKey").value || "").trim();
+  if (!key) throw new Error("Add your OpenRouter API key first (🔑 above).");
+  const model = currentModel();
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + key,
+      "Content-Type": "application/json",
+      "HTTP-Referer": location.origin || "https://masgames.app",
+      "X-Title": "MasGames"
+    },
+    body: JSON.stringify({
+      model, temperature: 0.9,
+      messages: [
+        { role: "system", content: "You are a witty party-game card writer. You output ONLY valid minified JSON, never markdown or commentary." },
+        { role: "user", content: buildPrompt(cfg) }
+      ]
+    })
+  });
+  if (!res.ok) {
+    let msg = `API error ${res.status}`;
+    try { const j = await res.json(); if (j.error?.message) msg += `: ${j.error.message}`; } catch {}
+    if (res.status === 401) msg += ". Check your OpenRouter key.";
+    if (res.status === 402) msg += ". Out of credit on OpenRouter.";
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content || "";
+  return parseCards(content);
+}
+
+function parseCards(text) {
+  let t = String(text).trim();
+  t = t.replace(/^```(?:json)?/i, "").replace(/```$/,"").trim();
+  let obj = null;
+  try { obj = JSON.parse(t); }
+  catch {
+    const s = t.indexOf("{"), e = t.lastIndexOf("}");
+    if (s >= 0 && e > s) { try { obj = JSON.parse(t.slice(s, e + 1)); } catch {} }
+  }
+  if (!obj || !Array.isArray(obj.cards)) throw new Error("Couldn't read the AI response. Try again, or pick a different model.");
+  obj.cards = obj.cards.filter(c => c && ((c.title && c.title.trim()) || (Array.isArray(c.lines) && c.lines.length)));
+  if (!obj.cards.length) throw new Error("No usable cards came back. Try again.");
+  return obj;
+}
+
+// Line icons for the deck picker — a native <select> can't hold SVG in its
+// options, so the icon sits beside the field and swaps with the selection.
+// Shared by the Host screen and the settings menu so the two pickers are
+// literally the same component — they cannot drift apart.
+const DECK_ICONS = {
+  aus:      '<path d="M4.2 9.9c.9-1.5 2.5-2.1 3.9-1.9L9.7 6l1.4 1.5L12.5 4.7l1.2 2.5 2-.6 1.4 1.6c1.6.6 2.9 2 3.1 3.6.2 1.8-.8 3.4-2.2 4.4-1.6 1.2-3.6 1.8-5.6 1.8-2.2 0-4.4-.6-6-1.8C4.8 15.2 3.8 13.4 3.8 11.6Z"/><circle cx="16.1" cy="19.6" r="1.15"/>',
+  cassette: '<rect x="2.6" y="5.6" width="18.8" height="12.8" rx="2.4"/><circle cx="8.6" cy="12" r="2"/><circle cx="15.4" cy="12" r="2"/><path d="M8.6 16.6h6.8"/>',
+  balloon:  '<path d="M12 3.2c3 0 5.2 2.4 5.2 5.6 0 3.6-3.2 6.6-5.2 6.6S6.8 12.4 6.8 8.8C6.8 5.6 9 3.2 12 3.2Z"/><path d="M12 15.4v1.6"/><path d="M12 17c-1.1.9.9 2 0 3.8"/>',
+  clapper:  '<rect x="2.8" y="9" width="18.4" height="11.2" rx="2.2"/><path d="M3.4 9 5.8 4.4l17 2.2-.6 3.4"/><path d="m9.4 4.9-1.8 4.2M15 5.6l-1.8 4.2"/>',
+  trophy:   '<path d="M8 4.2h8v4.4a4 4 0 0 1-8 0Z"/><path d="M8 5.6H5.4a2.6 2.6 0 0 0 2.6 4M16 5.6h2.6a2.6 2.6 0 0 1-2.6 4"/><path d="M12 12.6v3.6M8.8 19.8h6.4"/><path d="M10 16.2h4l.8 3.6H9.2Z"/>',
+  house:    '<path d="M3.6 10.6 12 4l8.4 6.6"/><path d="M5.6 12v7.8h12.8V12"/><path d="M10 19.8v-4.6h4v4.6"/>',
+  note:     '<circle cx="7" cy="17.4" r="2.6"/><circle cx="17.4" cy="15.2" r="2.6"/><path d="M9.6 17.4V6.6l10.4-2.2v10.8"/><path d="M9.6 9.6 20 7.4"/>',
+  cup:      '<path d="M5 8h11v6.4a4.6 4.6 0 0 1-9.2 0Z"/><path d="M16 9.4h1.8a2.4 2.4 0 0 1 0 4.8H16"/><path d="M4.4 19.8h12.4"/><path d="M8.4 4.6v1.6M12 3.8v2.4"/>',
+  moon:     '<path d="M20 14.4A8.4 8.4 0 0 1 9.6 4a8.4 8.4 0 1 0 10.4 10.4Z"/><path d="M16.6 4.6 17.3 6.4l1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7Z"/>',
+  dice:     '<rect x="3.2" y="3.2" width="10.6" height="10.6" rx="2.4"/><rect x="10.2" y="10.2" width="10.6" height="10.6" rx="2.4"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.1" fill="currentColor" stroke="none"/>',
+  deck:     '<rect x="9" y="3.4" width="11" height="15" rx="2.6"/><path d="M6.4 6.6 4.5 7.4a2 2 0 0 0-1.1 2.6l3.3 8.2a2 2 0 0 0 2.6 1.1l2-.8"/>',
+};
+const deckIcon = key => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+    stroke-linecap="round" stroke-linejoin="round">${DECK_ICONS[key] || DECK_ICONS.deck}</svg>`;
+
+// One deck dropdown, used in two places. Renders a field (icon + name + chevron)
+// and a themed option list; returns { value, set } so callers can drive it.
+function mountDeckPicker(host, opts, onPick) {
+  host.innerHTML = `
+    <div class="pickfield">
+      <button type="button" class="pickbtn" aria-haspopup="listbox" aria-expanded="false">
+        <span class="pick-ico"></span><span class="pick-label"></span>
+        <span class="pick-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+      <div class="picklist" role="listbox" hidden></div>
+    </div>`;
+  const field = host.querySelector(".pickfield"), btn = host.querySelector(".pickbtn"),
+        list  = host.querySelector(".picklist");
+  let value = opts.length ? opts[0].v : null;
+
+  const cur = () => opts.find(o => o.v === value) || opts[0];
+  function paint() {
+    const o = cur(); if (!o) return;
+    btn.querySelector(".pick-ico").innerHTML = deckIcon(o.icon);
+    btn.querySelector(".pick-label").textContent = o.title;
+  }
+  function open(on) {
+    list.hidden = !on;
+    btn.setAttribute("aria-expanded", String(on));
+    field.classList.toggle("open", on);
+    if (!on) return;
+    list.innerHTML = opts.map(o =>
+      `<button type="button" class="pickopt${o.v === value ? " on" : ""}" role="option"
+         aria-selected="${o.v === value}" data-v="${o.v}">
+         <span class="po-ico">${deckIcon(o.icon)}</span><span class="po-name">${esc(o.title)}</span>
+       </button>`).join("");
+    const sel = list.querySelector(".pickopt.on"); if (sel) sel.scrollIntoView({ block: "nearest" });
+  }
+  btn.addEventListener("click", e => { e.stopPropagation(); open(list.hidden); });
+  list.addEventListener("click", e => {
+    const b = e.target.closest(".pickopt"); if (!b) return;
+    value = b.dataset.v; paint(); open(false); if (onPick) onPick(value);
+  });
+  document.addEventListener("click", () => open(false));
+  paint();
+  return { get value() { return value; }, set(v) { value = v; paint(); if (onPick) onPick(v); } };
+}
+// deck list -> picker options, with the currently selected deck offered first
+function deckPickerOptions(includeCurrent) {
+  const all = window.BUILTIN_DECKS || [];
+  const cur = (includeCurrent && deck.length)
+    ? [{ v: "cur", title: $("deckSub").textContent || "Current deck", icon: "deck" }] : [];
+  return cur.concat(all.map((d, i) => ({ v: String(i), title: d.title, icon: d.icon })));
+}
+
+// ---------- rendering ----------
+function esc(s){ return String(s).replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+function cardInner(c, i, total) {
+  const hasTitle = c.title && c.title.trim();
+  const size = c.sizeHint === "lg" ? "lg" : c.sizeHint === "sm" ? "sm" : "md";
+  let lines = "";
+  if (Array.isArray(c.lines) && c.lines.length) {
+    const cls = "lines" + (c.lines.length > 6 ? " many" : "") + (hasTitle ? "" : " solo");
+    lines = `<div class="${cls}">` + c.lines.map(l => `<div class="li">${esc(l)}</div>`).join("") + `</div>`;
+  }
+  const main = hasTitle ? `<div class="main ${size}">${esc(c.title)}</div>` : "";
+  return `${c.badge ? `<div class="badge">${esc(c.badge)}</div>` : `<div class="badge">Card</div>`}
+    ${main}${lines}
+    ${c.note ? `<div class="note">${esc(c.note)}</div>` : ""}
+`;   // no footer: the MAS mark and card counter came off the card face
+}
+// The hero is a <video>, and a video that gets paused stays paused: the browser
+// suspends it when the tab is backgrounded or the phone is in Low Power Mode,
+// and `autoplay` only ever fires once. Without nudging it back the home screen
+// shows the still poster instead of the loop. Safe to call repeatedly.
+function playHero() {
+  const v = $("heroVideo");
+  if (!v) return;
+  const p = v.play();
+  if (p && p.catch) p.catch(() => {});           // blocked (Low Power Mode) → poster stands in
+}
+// A poisoned cache entry (a partial response stored as the whole file) kills
+// the loop with a decode error and the poster sticks. One cache-busting retry
+// straight from the network heals it for good.
+(() => {
+  const v = $("heroVideo");
+  if (v) v.addEventListener("error", () => {
+    if (v.dataset.retried) return;
+    v.dataset.retried = "1";
+    v.src = "./home-bg.webm?r=" + Date.now();
+    v.load(); playHero();
+  });
+})();
+document.addEventListener("visibilitychange", () => { if (!document.hidden) playHero(); });
+window.addEventListener("pageshow", playHero);   // also covers back/forward cache restores
+["pointerdown", "touchstart", "keydown"].forEach(ev =>
+  document.addEventListener(ev, playHero, { passive: true }));
+
+function renderPlayer() { renderDeck(); }
+// The card-flip player is gone: the home screen is the only main screen, and a
+// selected deck is just state that Host and All cards read.
+function renderDeck() {
+  $("empty").style.display = "flex";
+  syncHomeMark();
+  playHero();
+}
+function isListCard(c) { return c && Array.isArray(c.lines) && c.lines.length > 6; }
+
+// ---------- haptics ----------
+function buzz(p) { try { navigator.vibrate && navigator.vibrate(p); } catch {} }
+
+// ---------- celebrations ----------
+// One particle canvas over the whole app. burst() is a single pop, fireworks()
+// launches shells for a while, banner() pops a headline with it. Used for
+// spinner bonuses, spade steals and winning — live and solo both go through it.
+const FX = (() => {
+  const cv = $("fxCanvas"), ctx = cv.getContext("2d");
+  const COLORS = ["#00E5FF", "#8A2BE2", "#FFD100", "#FF2FD0", "#43e97b", "#ff7a1a", "#ffffff"];
+  let parts = [], raf = 0, until = 0, shellT = 0;
+  function fit() {
+    const r = cv.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== (r.width * d | 0)) { cv.width = r.width * d; cv.height = r.height * d; }
+    return d;
+  }
+  function spawn(x, y, n, power) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = (0.35 + Math.random() * 0.65) * power;
+      parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - power * 0.25,
+        r: 1.6 + Math.random() * 2.4, c: COLORS[Math.random() * COLORS.length | 0],
+        life: 1, decay: 0.012 + Math.random() * 0.014 });
+    }
+  }
+  function tick() {
+    const d = fit(), W = cv.width / d, H = cv.height / d;
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const now = performance.now();
+    if (now < until && now > shellT) {           // next firework shell
+      shellT = now + 260 + Math.random() * 300;
+      spawn(W * (0.18 + Math.random() * 0.64), H * (0.12 + Math.random() * 0.42),
+            34 + Math.random() * 22 | 0, 7 + Math.random() * 3);
+    }
+    parts = parts.filter(p => p.life > 0);
+    for (const p of parts) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.11; p.vx *= 0.985; p.vy *= 0.985;
+      p.life -= p.decay;                          // may cross 0 here, so clamp
+      const a = Math.max(0, p.life);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.c;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * a, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (parts.length || now < until) raf = requestAnimationFrame(tick);
+    else { raf = 0; cv.classList.remove("on"); }
+  }
+  const go = () => { cv.classList.add("on"); if (!raf) raf = requestAnimationFrame(tick); };
+  return {
+    burst(fx = 0.5, fy = 0.55, n = 26, power = 6) {
+      const d = fit(); spawn(cv.width / d * fx, cv.height / d * fy, n, power); go();
+    },
+    fireworks(ms = 2600) { until = performance.now() + ms; shellT = 0; go(); },
+    banner(text, sub) {
+      const b = $("fxBanner");
+      b.innerHTML = esc(text) + (sub ? `<small>${esc(sub)}</small>` : "");
+      b.classList.remove("go"); void b.offsetWidth; b.classList.add("go");
+    },
+  };
+})();
+window.FX = FX;
+
+
+function renderGrid() {
+  const s = $("gridScroll"); s.innerHTML = "";
+  // (the old #gridTitle heading was removed — the page header carries the name)
+  deck.forEach((c, i) => {
+    const pal = catPal(c, i);
+    const el = document.createElement("div");
+    el.className = "mini"; el.style.setProperty("--c1", pal[0]); el.style.setProperty("--c2", pal[1]);
+    el.style.setProperty("--ink", pal[2]);
+    el.classList.toggle("onlight", pal[2] !== "#ffffff");
+    const label = (c.title && c.title.trim()) ? c.title : (isListCard(c) ? `${c.lines.length} categories` : (Array.isArray(c.lines) && c.lines.length ? c.lines.join(" · ") : "Card"));
+    el.innerHTML = `<div class="badge">${esc(c.badge||"Card")}</div><div class="t">${esc(label)}</div>`;
+    el.addEventListener("click", () => { idx = i; renderDeck(); closeGrid(); });
+    s.appendChild(el);
+  });
+}
+
+// ---------- config & generate ----------
+function readConfig() {
+  return { brief: $("brief").value.trim(), audience: $("audience").value,
+    difficulty: $("difficulty").value, groupProfile: groupProfile() };
+}
+let busy = false;
+async function generate(append) {
+  if (busy) return;
+  const cfg = readConfig();
+  busy = true;
+  const gb = $("generateBtn");
+  if (gb) gb.disabled = true;
+  try {
+    if (!append) { deck = []; idx = 0; }
+    // Batched: a single 210-card response gets truncated by most models, so ask
+    // in chunks and pass the titles so far as `avoid` to keep them unique.
+    const target = append ? deck.length + DECK_BATCH : DECK_TARGET;
+    let guard = 0;
+    while (deck.length < target && guard++ < 4) {
+      const want = Math.min(DECK_BATCH, target - deck.length);
+      showToast(`Generating… ${deck.length}/${target} cards`);
+      if ($("genStatus")) $("genStatus").textContent = `Generating… ${deck.length}/${target}`;
+      const r = await callAI({ ...cfg, count: want, avoid: deck.map(c => c.title) });
+      if (!r.cards || !r.cards.length) break;
+      deck = deck.concat(r.cards);
+      if (!append && r.deckTitle && deck.length === r.cards.length) { setDeckSub(r.deckTitle); setDeckGame("wordsmash"); }
+    }
+    if (!deck.length) throw new Error("The model returned no cards. Try again.");
+    saveDeck(); renderPlayer(); hideToast(); closeSheet(); shareDeck(); openGrid();
+  } catch (e) { showToast(e.message, true); }
+  finally {
+    busy = false;
+    if (gb) gb.disabled = false;
+    if ($("genStatus")) $("genStatus").textContent = "Generate deck";
+  }
+}
+
+// ---------- toast ----------
+let toastT = null;
+function showToast(msg, err) { const t = $("toast"); t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.style.display = "block"; if (err) { clearTimeout(toastT); toastT = setTimeout(hideToast, 4500); } }
+function hideToast() { $("toast").style.display = "none"; }
+
+// ---------- sheet / grid ----------
+function openSheet(){ collapseSheet(); $("sheet").classList.add("open"); $("scrim").classList.add("open"); setHeaderClose(closeSheet); }
+function closeSheet(){ $("sheet").classList.remove("open"); $("scrim").classList.remove("open"); setPageTitle(""); setHeaderClose(null); }
+// A popup, so it doesn't claim the page title or the app bar's ✕ — it has its
+// own close and leaves the screen underneath exactly as it was.
+function openGrid(){
+  if(!deck.length){ showToast("No cards yet"); return; }
+  renderGrid();
+  $("cardsTitle").textContent = $("deckSub").textContent || "Deck";
+  $("cardsSub").textContent = `${deck.length} cards`;
+  $("gridView").classList.add("open");
+  $("cardsScrim").classList.add("open");
+  $("gridScroll").scrollTop = 0;
+}
+function closeGrid(){ $("gridView").classList.remove("open"); $("cardsScrim").classList.remove("open"); }
+
+// Home — close everything and fully reset back to the main (empty) screen
+function goHome() {
+  // Go through each overlay's own close(), not classList.remove(): they're what
+  // clear the shared header ✕ and the page title.
+  closeSheet(); closeGrid(); closeCloud();
+  if ($("liveView").classList.contains("open") && window.MasLive) window.MasLive.leaveLive();
+  setPageTitle(""); setHeaderClose(null);   // nothing is open now, whatever happened above
+  hideToast();
+  // full reset: clear the current deck and return to the home screen
+  deck.length = 0; idx = 0;
+  localStorage.removeItem(LS_DECK);
+  setDeckSub("");
+  renderPlayer();
+  showToast("Back to home"); setTimeout(hideToast, 1000);
+}
+$("settingsBtn").addEventListener("click", openSheet);
+// Reset wipes the loaded deck, so it asks first.
+function showResetConfirm(on) { $("resetConfirm").hidden = !on; $("resetBtn").hidden = on; }
+
+// The menu is an accordion: only one section open at a time, everything
+// collapsed whenever the sheet opens, and opening any section counts as
+// backing out of a pending reset.
+const sheetSections = () => [...document.querySelectorAll("#sheet > details.sect")];
+function collapseSheet() { sheetSections().forEach(d => { d.open = false; }); showResetConfirm(false); }
+sheetSections().forEach(d => d.addEventListener("toggle", () => {
+  if (!d.open) return;                       // only react to a section opening
+  showResetConfirm(false);
+  sheetSections().forEach(o => { if (o !== d) o.open = false; });
+}));
+$("resetBtn").addEventListener("click", () => showResetConfirm(true));
+$("resetCancel").addEventListener("click", () => showResetConfirm(false));
+$("resetYes").addEventListener("click", () => { showResetConfirm(false); goHome(); });
+$("headerClose").addEventListener("click", () => { if (headerCloseFn) headerCloseFn(); });
+$("scrim").addEventListener("click", closeSheet);
+$("cardsClose").addEventListener("click", closeGrid);
+$("cardsScrim").addEventListener("click", closeGrid);
+// Menu items live inside the settings sheet, which stacks above these overlays,
+// so close the sheet before opening them.
+// The menu uses the same dropdown as the Host screen rather than its own list.
+let menuPick = null;
+function buildMenuPicker() {
+  const opts = deckPickerOptions(false);
+  menuPick = mountDeckPicker($("menuPick"), opts, paintMenuPick);
+  paintMenuPick(menuPick.value);
+}
+function menuPickedDeck() {
+  const all = window.BUILTIN_DECKS || [];
+  return menuPick ? all[+menuPick.value] : null;
+}
+function paintMenuPick() {
+  const d = menuPickedDeck();
+  $("menuPickGo").title = d ? `See all ${d.cards.length} cards in ${d.title}` : "See all cards";
+}
+$("menuPickGo").addEventListener("click", () => { const d = menuPickedDeck(); if (d) openDeck(d); });
+$("decksSect").addEventListener("toggle", () => { if ($("decksSect").open) { buildMenuPicker(); loadList(); } });
+$("generateBtn").addEventListener("click", () => generate(false));
+
+// ---------- cloud (Cloudflare Worker + D1) ----------
+// The deck library lives inside the menu sheet now — "opening" it just means
+// showing the sheet with the Decks section expanded, no separate page.
+function openCloud() { openSheet(); $("decksSect").open = true; loadList(); }
+function openCloudLibrary() { openCloud(); }
+function closeCloud() { const d = $("decksSect"); if (d) d.open = false; }
+function makeQR(text) { try { const qr = qrcode(0, "M"); qr.addData(text); qr.make(); return qr.createDataURL(6); } catch { return null; } }
+
+// Every generated deck goes to the shared library automatically — there's no
+// "save" decision to make when the rule is that all decks are shared. Silent by
+// design: it must never block or fail the generate that just succeeded.
+async function shareDeck() {
+  if (!cloudOn() || !deck.length) return;
+  try {
+    const r = await fetch(API_BASE + "/api/decks", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: $("deckSub").textContent, cards: deck, owner: userId, isPublic: true }) });
+    if (!r.ok) return;
+    loadList();
+  } catch (e) { /* offline or Worker down — the deck still works on this phone */ }
+}
+
+async function loadList() {
+  const el = $("cloudList");
+  // One list, no tabs. Built-ins ship with the app and always show; anything
+  // saved or shared is appended once the Worker is configured.
+  const builtins = (window.BUILTIN_DECKS || []).map((d, i) => ({ ...d, _builtin: i }));
+  renderDeckRows(builtins);
+  if (!cloudOn()) return;
+  try {
+    const [mineR, pubR] = await Promise.all([
+      fetch(API_BASE + "/api/decks?owner=" + encodeURIComponent(userId)),
+      fetch(API_BASE + "/api/decks?public=1"),
+    ]);
+    const mine = mineR.ok ? await mineR.json() : [];
+    const pub  = pubR.ok  ? await pubR.json()  : [];
+    const seen = new Set();
+    const cloud = [].concat(Array.isArray(mine) ? mine : [], Array.isArray(pub) ? pub : [])
+      .filter(d => d && !seen.has(d.id) && seen.add(d.id))
+      .map(d => ({ ...d, _mine: (Array.isArray(mine) ? mine : []).some(m => m.id === d.id) }));
+    if (cloud.length) renderDeckRows(builtins.concat(cloud));
+  } catch (e) { /* offline or Worker down — the built-ins still stand */ }
+}
+
+// Shared row renderer for built-in and cloud deck lists
+const GAME_LABEL = { gutterhead: "Gutterhead", articulate: "Articulate", scattergories: "Scattergories" };
+function renderDeckRows(list) {
+  const el = $("cloudList");
+  if (!list.length) { el.innerHTML = `<div class="cloud-msg">Nothing here yet.</div>`; return; }
+  el.innerHTML = "";
+  list.forEach(d => {
+    const count = Array.isArray(d.cards) ? d.cards.length : 0;
+    const bits = [count + " cards"];
+    if (d.audience) bits.push(/spicy/.test(d.audience) ? "18+" : d.audience.replace(/\s*\(.*\)/, ""));
+    const row = document.createElement("div");
+    row.className = "deckrow";
+    // No thumbnail: the swatch was a random palette colour with no meaning, and
+    // it made every row tall enough that you could only see a few at a time.
+    row.innerHTML = `<span class="n">${esc(d.title || "Untitled")}</span>
+      <span class="s">${esc(bits.join(" · "))}</span>
+      ${d._mine ? '<span class="del" title="Delete">🗑</span>' : ''}`;
+    row.addEventListener("click", () => openDeck(d));
+    const del = row.querySelector(".del");
+    if (del) del.addEventListener("click", (ev) => { ev.stopPropagation(); if (confirm("Delete this deck?")) deleteDeck(d.id); });
+    el.appendChild(row);
+  });
+}
+// .slice() is load-bearing: assigning d.cards directly aliased the built-in
+// deck's own array, and goHome() empties `deck` in place — which permanently
+// wiped that deck's cards for the rest of the session.
+// Picking a deck selects it and shows its cards. There is no card-by-card
+// player any more — a selected deck is what Host offers and what All cards lists.
+function openDeck(d) {
+  deck = Array.isArray(d.cards) ? d.cards.slice() : []; idx = 0;
+  setDeckSub(d.title); setDeckGame(d.game || inferGame(deck)); saveDeck();
+  renderPlayer(); openGrid();          // stay in the menu; the popup layers over it
+}
+async function deleteDeck(id) {
+  try { await fetch(API_BASE + "/api/decks/" + id + "?owner=" + encodeURIComponent(userId), { method: "DELETE" }); loadList(); }
+  catch (e) { showToast(e.message, true); }
+}
+async function checkShareLink() {
+  const did = new URLSearchParams(location.search).get("d");
+  if (!did || !cloudOn()) return;
+  showToast("Loading shared deck…");
+  try {
+    const r = await fetch(API_BASE + "/api/decks/" + encodeURIComponent(did));
+    if (!r.ok) throw new Error("Shared deck not found");
+    const d = await r.json();
+    deck = Array.isArray(d.cards) ? d.cards : []; idx = 0; setDeckSub(d.title); setDeckGame(d.game || inferGame(deck)); saveDeck(); renderPlayer(); hideToast();
+  } catch (e) { showToast(e.message, true); }
+}
+
+// Don't dim the whole Deck library: its "Built-in" tab is the 10 bundled decks
+// and needs no Worker at all. Only "Mine" and "Shared" depend on the cloud, so
+// mark just those — dimming the button implied nothing in there worked.
+
+
+// ---------- PWA: service worker + install ----------
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredPrompt = e; showInstall("android"); });
+function showInstall(kind) {
+  if (isStandalone || localStorage.getItem("masgames_install_dismissed")) return;
+  const b = $("installBanner");
+  if (kind === "ios") { $("installTxt").innerHTML = "Install: tap <b>Share</b> then <b>Add to Home Screen</b>."; $("installBtn").style.display = "none"; }
+  else { $("installTxt").textContent = "Install MAS as an app?"; $("installBtn").style.display = ""; }
+  b.classList.add("show");
+}
+$("installBtn").addEventListener("click", async () => { if (deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; $("installBanner").classList.remove("show"); } });
+$("installX").addEventListener("click", () => { localStorage.setItem("masgames_install_dismissed","1"); $("installBanner").classList.remove("show"); });
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+if (isIOS && !isStandalone) setTimeout(() => showInstall("ios"), 1500);
+
+// ---------- init ----------
+syncHeaderHeight();
+renderPageTitle();
+renderPlayer();
+checkShareLink();
+</script>
+<script src="./live.js"></script>
+</body>
+</html>

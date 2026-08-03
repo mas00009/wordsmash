@@ -1,0 +1,53 @@
+<svg viewBox="0 0 120 128" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <defs>
+    <linearGradient id="neon" x1="16" y1="20" x2="104" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00E5FF"/>
+      <stop offset="0.55" stop-color="#00E5FF"/>
+      <stop offset="1" stop-color="#8A2BE2"/>
+    </linearGradient>
+    <linearGradient id="mgrad" x1="42" y1="52" x2="78" y2="86" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cfe9ff"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDev="2.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- hex badge -->
+  <path d="M38 20 L82 20 L104 58 L82 96 L38 96 L16 58 Z"
+        fill="rgba(10,16,28,0.65)" stroke="url(#neon)" stroke-width="4.5"
+        stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- meeple (top) -->
+  <g fill="#00E5FF" filter="url(#glow)">
+    <circle cx="60" cy="27" r="7"/>
+    <path d="M60 34
+             C53 34 49 39 48 44
+             C47 47 44 48 41 48
+             C38 48 37 50.5 40 52
+             C42.5 53 45 52 47 50.5
+             C47 54 47 57 48 59
+             C49 61 51 61 52 58.5
+             L55 52
+             C56.5 49.5 63.5 49.5 65 52
+             L68 58.5
+             C69 61 71 61 72 59
+             C73 57 73 54 73 50.5
+             C75 52 77.5 53 80 52
+             C83 50.5 82 48 79 48
+             C76 48 73 47 72 44
+             C71 39 67 34 60 34 Z"/>
+  </g>
+
+  <!-- M (center) -->
+  <path d="M43 82 L43 54 L60 71 L77 54 L77 82" stroke="url(#mgrad)" stroke-width="8"
+        stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- pawn (bottom) -->
+  <g fill="#FFD100" filter="url(#glow)">
+    <circle cx="60" cy="98" r="5"/>
+    <path d="M55.5 102 C55.5 106 54 109 52 112 C50.5 114 53 115 56 115 L64 115 C67 115 69.5 114 68 112 C66 109 64.5 106 64.5 102 C62.5 104 57.5 104 55.5 102 Z"/>
+  </g>
+</svg>
