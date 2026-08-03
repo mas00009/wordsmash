@@ -26,21 +26,16 @@ LW, LH = logo.size
 
 
 def plate(size):
-    """Near-black tile with the brand's cyan→violet glow, so the bands the wide
-    logo leaves read as deliberate rather than empty."""
-    img = Image.new("RGB", (size, size), (11, 15, 23))
+    """Dark minimal tile — matches an iOS home screen of dark glyph icons.
+    Near-black with only a whisper of a centre highlight so it isn't dead flat."""
+    img = Image.new("RGB", (size, size), (16, 18, 23))
     px = img.load()
     for y in range(size):
         for x in range(size):
             r, g, b = px[x, y]
-            # cyan bloom from upper-left, violet from lower-right
-            dc = math.hypot((x - size * 0.30) / (size * 0.85), (y - size * 0.24) / (size * 0.85))
-            dv = math.hypot((x - size * 0.74) / (size * 0.90), (y - size * 0.84) / (size * 0.90))
-            c = max(0.0, 1.0 - dc) ** 2 * 0.42
-            v = max(0.0, 1.0 - dv) ** 2 * 0.50
-            px[x, y] = (min(255, int(r + 138 * v)),
-                        min(255, int(g + 229 * c + 43 * v)),
-                        min(255, int(b + 255 * c + 226 * v)))
+            d = math.hypot((x - size * 0.5) / size, (y - size * 0.42) / size)
+            h = max(0.0, 1.0 - d * 2.1) ** 2 * 0.06
+            px[x, y] = (min(255, int(r + 26 * h)), min(255, int(g + 30 * h)), min(255, int(b + 40 * h)))
     return img.convert("RGBA")
 
 
@@ -65,17 +60,17 @@ def rounded(img, radius_ratio=0.22):
 
 # "any" icons: rounded, transparency outside the corners is fine here
 for size, name in ((512, "icon-512.png"), (192, "icon-192.png")):
-    rounded(place(size, size * 0.90)).save(name)
+    rounded(place(size, size * 0.64)).save(name)
     print("wrote", name)
 
 # iOS masks this itself — hand it a plain opaque square
-place(180, 180 * 0.90).convert("RGB").save("apple-touch-icon.png")
+place(180, 180 * 0.64).convert("RGB").save("apple-touch-icon.png")
 print("wrote apple-touch-icon.png")
 
 # Maskable: content must sit inside the 80% safe-zone circle. For a w:h logo the
 # half-diagonal is (w/2)*sqrt(1+(h/w)^2), and that has to fit the circle radius.
 S = 512
 radius = S * 0.40
-safe_w = 2 * radius / math.sqrt(1 + (LH / LW) ** 2)
+safe_w = min(2 * radius / math.sqrt(1 + (LH / LW) ** 2), S * 0.64)
 place(S, safe_w).convert("RGB").save("icon-maskable-512.png")
 print("wrote icon-maskable-512.png (logo %.0fpx wide, safe-zone limit %.0f)" % (safe_w, safe_w))
