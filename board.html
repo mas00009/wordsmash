@@ -159,7 +159,7 @@ const M = window.WORDSMASH;
 const qs = new URLSearchParams(location.search);
 const CODE = (qs.get("code") || qs.get("board") || "").toUpperCase();
 // Board view is read-only: it just polls the same session the phones use.
-const API_BASE = qs.get("api") || localStorage.getItem("masgames_api") || "https://REPLACE-ME.workers.dev";
+const API_BASE = qs.get("api") || localStorage.getItem("masgames_api") || "https://masgames-api.mmohammad.workers.dev";
 const cloudOn = () => /^https?:\/\//.test(API_BASE) && !/REPLACE-ME/.test(API_BASE);
 let S = null, lastV = 0;
 
