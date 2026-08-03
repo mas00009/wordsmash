@@ -529,7 +529,10 @@
   .live-view.artbg { background: #0b1019; }
   /* Animated backdrop, shown only on the join screen. The poster is the still
      version, so a blocked autoplay (iOS Low Power Mode) degrades to the image. */
-  .joinbg { display: none; position: absolute; inset: 0; width: 100%; height: 100%;
+  /* Pinned to the physical screen exactly like the home backdrop — anchored to
+     the layout box it stopped short at the screen bottom on installed iOS. */
+  .joinbg { display: none; position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+    width: min(100vw, 480px); height: 100%; height: 100lvh;
     object-fit: cover; object-position: center bottom; z-index: 0; }
   .live-view.artbg .joinbg { display: block; }
   /* The first stop is the app bar's own #0b1019 so there's no colour step where
