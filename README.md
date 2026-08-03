@@ -26,6 +26,13 @@ The real game's spinner gives +2/+3; ours is tuned to +1/+2 with much lower odds
 - The **host sets up teams** after players join.
 - A separate **board view** runs on a TV or laptop, showing team tokens moving live.
 
+## Live
+
+- **Play:** https://mas00009.github.io/wordsmash/
+- **Board (TV):** https://mas00009.github.io/wordsmash/board.html?code=ROOMCODE
+- **API:** https://masgames-api.mmohammad.workers.dev (Cloudflare Worker + D1)
+- **Repo:** https://github.com/mas00009/wordsmash
+
 ## Stack
 
 - **Frontend:** static files on **GitHub Pages**
