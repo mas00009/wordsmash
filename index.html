@@ -411,6 +411,25 @@
   .teamrow .minus { background: rgba(255,255,255,.12); }
   .teamrow .rm { color: var(--danger); font-size: 17px; padding: 4px; cursor: pointer; }
 
+  /* Installed fullscreen mode: iOS clips the page short of the screen by the
+     status-bar inset (59px on Dynamic Island phones) at the BOTTOM. Reserve
+     exactly that strip: buttons rise above the clip line, and each screen's
+     bottom fade completes right at it so the clipped remainder continues in
+     the same flat colour. Safari/desktop (no clip) are untouched. */
+  @media all and (display-mode: standalone) {
+    .live-inner { padding-bottom: max(calc(12px + var(--sab)), calc(26px + var(--sat))); }
+    .empty { padding-bottom: max(calc(12px + var(--sab)), calc(20px + var(--sat))); }
+    .live-view.artbg::after {
+      background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - var(--sat) - 64px), #0b1019 calc(100% - var(--sat))),
+        linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.86) 22%, rgba(11,16,25,.45) 45%, rgba(11,16,25,0) 66%); }
+    .live-view.vid::after {
+      background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - var(--sat) - 64px), #0b1019 calc(100% - var(--sat))),
+        linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%, rgba(11,16,25,.62) 44%, rgba(11,16,25,.34) 100%); }
+    .homeveil {
+      background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
+        rgba(4,6,12,0) 50%, rgba(4,6,12,.8) calc(100% - var(--sat) - 30px), #04060c calc(100% - var(--sat))); }
+  }
+
   /* time's-up flash */
   .flash { position: absolute; inset: 0; background: var(--danger); opacity: 0; pointer-events: none; z-index: 60; }
   .flash.go { animation: flashfx .55s ease 3; }
