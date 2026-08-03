@@ -218,7 +218,9 @@
   .empty .tagblock, .empty .home-actions { position: relative; z-index: 2; }
   /* strapline + its rule travel together as one block, so the even spacing
      applies between logo / strapline / buttons and not inside the pair */
-  .tagblock { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 9px; }
+  /* nudged down so it sits midway between the badge and the buttons */
+  .tagblock { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 9px;
+    margin-top: 7vh; }
   .tagline { flex: 0 0 auto; margin: 0; font-size: 15px; font-weight: 800; line-height: 1.4;
     color: #dbe4f5; text-transform: uppercase; letter-spacing: .09em; }
   /* hairline · diamond · hairline under the tagline */
