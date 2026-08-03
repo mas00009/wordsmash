@@ -42,8 +42,13 @@
      no hard edge can ever show below the app. */
   html { margin: 0; padding: 0; height: 100%; overscroll-behavior: none;
     background: linear-gradient(180deg, #0b1019 0%, #0b0c1a 70%, #0d0a1c 100%); }
+  /* --shellH is set from JS: in the installed (standalone) app iOS lays the
+     page out SHORT by the status-bar inset and leaves a black strip at the
+     bottom of the screen — sizing the shell to the real screen height paints
+     right over it. Everywhere else it's simply the viewport height. */
   body { margin: 0; padding: 0; position: fixed; top: 0; left: 0; right: 0;
-    height: 100%; height: 100lvh; overflow: hidden; overscroll-behavior: none; }
+    height: 100%; height: 100lvh; height: var(--shellH, 100lvh);
+    overflow: hidden; overscroll-behavior: none; }
   body {
     font-family: ui-rounded, "SF Pro Rounded", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
@@ -202,17 +207,19 @@
      logo → strapline → buttons cadence the old three-block layout had. */
   .empty { position: relative; flex: 1; display: flex; flex-direction: column;
     align-items: center; justify-content: flex-start; gap: 0;
-    text-align: center; padding: 40vh 18px calc(12px + var(--sab)); color: var(--muted); min-height: 0;
+    text-align: center; padding: calc(var(--shellH, 100lvh) * 0.40) 18px calc(12px + var(--sab));
+    color: var(--muted); min-height: 0;
     background: #04060c; }
   /* Pinned to the physical screen (largest viewport), not the layout box —
      flex rounding and browser chrome left slivers below a box-anchored video.
      Runs up behind the transparent bar; the bar sits at z 80, still tappable. */
   .homebg { position: fixed; top: 0; left: 50%; transform: translateX(-50%);
-    width: min(100vw, 480px); height: 100%; height: 100lvh;
+    width: min(100vw, 480px); height: 100lvh; height: var(--shellH, 100lvh);
     object-fit: cover; object-position: center top; z-index: 0; }
   /* dark ramp at the bottom so the buttons sit on something quiet */
   .homeveil { position: fixed; top: 0; left: 50%; transform: translateX(-50%);
-    width: min(100vw, 480px); height: 100%; height: 100lvh; z-index: 1; pointer-events: none;
+    width: min(100vw, 480px); height: 100lvh; height: var(--shellH, 100lvh);
+    z-index: 1; pointer-events: none;
     background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
       rgba(4,6,12,0) 52%, rgba(4,6,12,.72) 84%, rgba(4,6,12,.92) 100%); }
   .empty .tagblock, .empty .home-actions { position: relative; z-index: 2; }
@@ -1100,6 +1107,18 @@
 <script src="./decks.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
+// iOS standalone lays out short by the top status-bar inset (the black strip
+// at the bottom of installed apps). screen.height is the real screen in CSS
+// points, so the shell stretches to it there; everywhere else innerHeight.
+function fitShell() {
+  const standalone = (navigator.standalone === true) ||
+    (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
+  const h = standalone ? Math.max(window.innerHeight, screen.height) : window.innerHeight;
+  document.documentElement.style.setProperty("--shellH", h + "px");
+}
+fitShell();
+window.addEventListener("resize", fitShell);
+window.addEventListener("orientationchange", () => setTimeout(fitShell, 300));
 const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
 const LS_KEY = "masgames_or_key", LS_MODEL = "masgames_or_model", LS_DECK = "masgames_deck", LS_GROUP = "masgames_group";
 const DEFAULT_GROUP = "Aussie crew, all born in the early 1980s. We grew up on Australian culture plus the American movies, TV, music and games of the '80s and '90s, and still love American pop culture. Lean into that shared nostalgia.";
