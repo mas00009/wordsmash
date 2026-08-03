@@ -417,17 +417,18 @@
      bottom fade completes right at it so the clipped remainder continues in
      the same flat colour. Safari/desktop (no clip) are untouched. */
   @media all and (display-mode: standalone) {
-    .live-inner { padding-bottom: max(calc(12px + var(--sab)), calc(26px + var(--sat))); }
-    .empty { padding-bottom: max(calc(12px + var(--sab)), calc(20px + var(--sat))); }
+    .live-inner { padding-bottom: max(calc(12px + var(--sab)), calc(26px + var(--sat)), 76px); }
+    .empty { padding-bottom: max(calc(12px + var(--sab)), calc(20px + var(--sat)), 64px); }
+    .joinbody { padding-bottom: calc(26% + 40px); }
     .live-view.artbg::after {
-      background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - var(--sat) - 64px), #0b1019 calc(100% - var(--sat))),
+      background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - max(var(--sat), 64px) - 60px), #0b1019 calc(100% - max(var(--sat), 64px))),
         linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.86) 22%, rgba(11,16,25,.45) 45%, rgba(11,16,25,0) 66%); }
     .live-view.vid::after {
-      background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - var(--sat) - 64px), #0b1019 calc(100% - var(--sat))),
+      background: linear-gradient(180deg, rgba(11,16,25,0) calc(100% - max(var(--sat), 64px) - 60px), #0b1019 calc(100% - max(var(--sat), 64px))),
         linear-gradient(180deg, #0b1019 0%, rgba(11,16,25,.9) 16%, rgba(11,16,25,.62) 44%, rgba(11,16,25,.34) 100%); }
     .homeveil {
       background: linear-gradient(180deg, rgba(4,6,12,.25) 0%, rgba(4,6,12,0) 20%,
-        rgba(4,6,12,0) 50%, rgba(4,6,12,.8) calc(100% - var(--sat) - 30px), #04060c calc(100% - var(--sat))); }
+        rgba(4,6,12,0) 50%, rgba(4,6,12,.8) calc(100% - max(var(--sat), 40px) - 30px), #04060c calc(100% - max(var(--sat), 40px))); }
   }
 
   /* time's-up flash */
@@ -1132,7 +1133,15 @@ const $ = (id) => document.getElementById(id);
 // this page) bottom-centre of home, so you always know what you're looking at
 fetch("./sw.js").then(r => r.text()).then(t => {
   const m = t.match(/wordsmash-(v\d+)/);
-  if (m && $("verBadge")) $("verBadge").textContent = m[1];
+  if (m && $("verBadge")) {
+    const cs = getComputedStyle(document.documentElement);
+    const standalone = (navigator.standalone === true) ||
+      (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
+    const vv = window.visualViewport ? Math.round(visualViewport.height) : "-";
+    $("verBadge").textContent = m[1] + " · ih" + innerHeight + " sh" + screen.height
+      + " vv" + vv + " st" + cs.getPropertyValue("--sat").trim() + " sb" + cs.getPropertyValue("--sab").trim()
+      + (standalone ? " · app" : " · web");
+  }
 }).catch(() => {});
 const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
 const LS_KEY = "masgames_or_key", LS_MODEL = "masgames_or_model", LS_DECK = "masgames_deck", LS_GROUP = "masgames_group";
