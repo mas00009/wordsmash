@@ -246,8 +246,35 @@
   .home-actions { flex: 0 0 auto; width: 100%; max-width: 250px; display: flex; flex-direction: column; gap: 8px; }
   .spinner { width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; vertical-align: -3px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100px + var(--sab)); background: rgba(0,0,0,.82); color: #fff; padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 700; z-index: 40; max-width: calc(100% - 20px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+  /* Above the live view (55) and the sheet (50), under the app bar (80): a
+     message nobody can see is not a message, and every in-game toast — time's
+     up, skip gone, board link copied — was landing behind the game screen. */
+  .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100px + var(--sab)); background: rgba(0,0,0,.82); color: #fff; padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 700; z-index: 78; max-width: calc(100% - 20px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
   .toast.err { background: var(--danger); }
+
+  /* Undo pill: the same spot as the toast, but tappable. Sits above the footer
+     buttons so the thumb that just hit "Got it" is already in the right place.
+     It fades on its own; the bar underneath drains to show the time left. */
+  .undobar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(124px + var(--sab));
+    z-index: 79; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px;
+    background: rgba(0,0,0,.86); border: 1px solid rgba(255,255,255,.14); border-radius: 999px;
+    font-size: 13px; font-weight: 800; color: #dbe4f7; white-space: nowrap; overflow: hidden;
+    /* the slide is decoration only — nothing about being visible is left to the
+       animation, so a backgrounded tab (where animations sit frozen at their
+       first frame) still shows a solid, tappable pill */
+    animation: undoin .18s ease-out; }
+  .undobar.out { opacity: 0; transition: opacity .2s; }
+  .undobar button { appearance: none; border: none; cursor: pointer; padding: 8px 15px; border-radius: 999px;
+    font: inherit; font-weight: 900; letter-spacing: .02em; color: #04060c;
+    background: linear-gradient(120deg, #00E5FF, #8A2BE2); }
+  .undobar button:active { transform: translateY(1px); }
+  .undobar i { position: absolute; left: 0; bottom: 0; height: 2px; background: rgba(255,255,255,.4);
+    width: 100%; transform-origin: left; animation: undodrain var(--ud, 4s) linear both; }
+  @keyframes undoin { from { transform: translate(-50%, 10px); } to { transform: translate(-50%, 0); } }
+  @keyframes undodrain { to { transform: scaleX(0); } }
+
+  /* Settings hint under a row of pickers */
+  .sethint { margin: 10px 2px 0; font-size: 12.5px; line-height: 1.5; color: rgba(219,228,247,.6); }
 
   /* Overlays sit BELOW the persistent header (--headerH set from JS) */
   /* All cards is a popup, not a page: it layers over the menu so closing it
@@ -728,6 +755,9 @@
     text-shadow: 0 4px 26px rgba(0,0,0,.6); }
   .gs-head .tagrule { margin: 10px auto 0; }
   .gs-sub { margin: 12px 0 0; font-size: 14px; font-weight: 700; color: #b3c0da; }
+  /* the room's terms in one quiet line, under the code */
+  .gs-note { margin: -4px 0 2px; text-align: center; font-size: 12px; font-weight: 800;
+    letter-spacing: .04em; text-transform: uppercase; color: rgba(179,192,218,.62); }
   /* Long screens (lobby, teams) scroll from the top; short ones centre. Centring
      an overflowing column clips its head, so it's opt-in rather than default. */
   /* overflow-x hidden: the rotated "wins!" pokes past the column's box, and the
@@ -872,6 +902,9 @@
   .gbtn svg { width: 18px; height: 18px; flex: none; }
   .gbtn:active { transform: translateY(2px); }
   .gbtn:disabled { opacity: .45; box-shadow: none; cursor: default; transform: none; }
+  /* a used-up skip keeps its place in the row rather than disappearing under a
+     thumb that's already on the way down; it just reads spent */
+  .gbtn.spent { opacity: .42; }
   .gbtn.ghost { flex: none; padding: 17px 20px; font-size: 15px; box-shadow: none;
     border: 2px solid transparent; color: #c2cde6;
     background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
@@ -1026,6 +1059,7 @@
     </div>
 
     <div class="toast" id="toast" style="display:none;"></div>
+    <div class="undobar" id="undobar" style="display:none;"></div>
   </main>
 
   <div class="scrim" id="cardsScrim"></div>
@@ -1073,6 +1107,31 @@
           </button>
         </div>
         <div id="cloudList" hidden></div>
+      </div>
+    </details>
+
+    <details class="sect" id="gameSect">
+      <summary><span class="sglabel"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3 1.8"/></svg></span>Game settings</span><span class="chev">›</span></summary>
+      <div class="sect-body">
+        <div class="two">
+          <div class="field">
+            <label for="setBoardLen">Game length</label>
+            <select id="setBoardLen">
+              <option value="48">Full · 48</option>
+              <option value="24">Quick · 24</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="setSkips">Skips per turn</label>
+            <select id="setSkips">
+              <option value="0">None</option>
+              <option value="1">1 skip</option>
+              <option value="2">2 skips</option>
+              <option value="3">3 skips</option>
+            </select>
+          </div>
+        </div>
+        <p class="sethint" id="gameHint"></p>
       </div>
     </details>
 
@@ -1673,6 +1732,34 @@ let toastT = null;
 function showToast(msg, err) { const t = $("toast"); t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.style.display = "block"; if (err) { clearTimeout(toastT); toastT = setTimeout(hideToast, 4500); } }
 function hideToast() { $("toast").style.display = "none"; }
 
+// ---------- undo pill ----------
+// A short window to take back the last tap. Only one can be up at a time, and
+// taking the offer or letting it run out both close it for good.
+let undoT = null, undoOutT = null;
+function showUndo(label, fn, ms) {
+  const d = ms || 4000, b = $("undobar");
+  clearTimeout(undoT); clearTimeout(undoOutT);
+  b.classList.remove("out");
+  b.style.setProperty("--ud", d + "ms");
+  b.innerHTML = "";
+  b.appendChild(Object.assign(document.createElement("span"), { textContent: label }));
+  const btn = Object.assign(document.createElement("button"), { textContent: "Undo", type: "button" });
+  btn.addEventListener("click", () => { hideUndo(); try { fn(); } catch {} });
+  b.appendChild(btn);
+  b.appendChild(document.createElement("i"));
+  // going from display:none to flex starts the entry animation, and the drain
+  // bar is a brand new element every time, so both replay on their own
+  b.style.display = "flex";
+  undoT = setTimeout(hideUndo, d);
+}
+function hideUndo() {
+  clearTimeout(undoT); clearTimeout(undoOutT);
+  const b = $("undobar");
+  if (b.style.display === "none") return;
+  b.classList.add("out");
+  undoOutT = setTimeout(() => { b.style.display = "none"; b.classList.remove("out"); b.innerHTML = ""; }, 200);
+}
+
 // ---------- sheet / grid ----------
 function openSheet(){ collapseSheet(); $("sheet").classList.add("open"); $("scrim").classList.add("open"); setHeaderClose(closeSheet); }
 function closeSheet(){ $("sheet").classList.remove("open"); $("scrim").classList.remove("open"); setPageTitle(""); setHeaderClose(null); }
@@ -1718,6 +1805,25 @@ sheetSections().forEach(d => d.addEventListener("toggle", () => {
   showResetConfirm(false);
   sheetSections().forEach(o => { if (o !== d) o.open = false; });
 }));
+// ---------- game settings ----------
+// The host's choices, kept on this device and baked into a room when it's
+// created. Changing them never touches a game already in progress.
+function paintGameHint() {
+  const len = +$("setBoardLen").value, sk = +$("setSkips").value;
+  const time = len === 24 ? "about 20 minutes" : "about 40 minutes";
+  const skips = sk === 0 ? "no skips" : sk === 1 ? "one skip a turn" : sk + " skips a turn";
+  $("gameHint").textContent = `A ${len} space board, ${time}, ${skips}. Set before you host: a game already running keeps the settings it started with.`;
+}
+(function initGameSettings() {
+  const len = $("setBoardLen"), sk = $("setSkips");
+  len.value = localStorage.getItem("masgames_boardlen") === "24" ? "24" : "48";
+  const s = localStorage.getItem("masgames_skips");
+  sk.value = s === null || s === "" ? "1" : String(Math.max(0, Math.min(3, +s | 0)));
+  len.addEventListener("change", () => { localStorage.setItem("masgames_boardlen", len.value); paintGameHint(); });
+  sk.addEventListener("change", () => { localStorage.setItem("masgames_skips", sk.value); paintGameHint(); });
+  paintGameHint();
+})();
+
 $("resetBtn").addEventListener("click", () => showResetConfirm(true));
 $("resetCancel").addEventListener("click", () => showResetConfirm(false));
 $("resetYes").addEventListener("click", () => { showResetConfirm(false); goHome(); });

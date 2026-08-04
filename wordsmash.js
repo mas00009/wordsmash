@@ -33,57 +33,93 @@
   // Real board order, with DRAW woven in as a 7th step.
   const CYCLE = ["OBJECT", "NATURE", "RANDOM", "PERSON", "ACTION", "WORLD", "DRAW"];
   const SPADE_EVERY = 8;   // a white spade/control space every 8th step
-  const TOTAL = 48;        // segments around the ring
+  const TOTAL = 48;        // segments around the ring (the full board)
   const TURN_SECONDS = 30; // authentic 30-second turns
 
   // BOARD[i] = { cat, spade, spinner }
   // Spinner spaces are the Action/Random segments, matching "orange or red".
-  const BOARD = (function () {
+  // Same rules at any size, so the short board keeps the full board's rhythm:
+  // seven categories in a row, then a white spade to close the lap.
+  function makeBoard(total) {
     const b = []; let ci = 0;
-    for (let i = 0; i < TOTAL; i++) {
+    for (let i = 0; i < total; i++) {
       if ((i + 1) % SPADE_EVERY === 0) { b.push({ cat: "SPADE", spade: true, spinner: false }); continue; }
       const cat = CYCLE[ci++ % CYCLE.length];
       b.push({ cat, spade: false, spinner: cat === "ACTION" || cat === "RANDOM" });
     }
     b[0] = { cat: "OBJECT", spade: false, spinner: false }; // everyone starts on Object
     return b;
-  })();
-  const WIN_POS = BOARD.length;
+  }
 
-  // Centre spinner shares the board's 48 segments — same angles, same colours —
-  // so the inner wheel lines up radially with the outer ring and reads as one
+  // The full game, untouched.
+  const BOARD = makeBoard(TOTAL);
+  const WIN_POS = BOARD.length;
+  // The quick game: its own board, three laps of the cycle instead of six, with
+  // its own finish. Nothing is shared with the 48 board but the rules that build
+  // it, so changing one can never move the other one's finish line.
+  const SHORT_TOTAL = 24;
+  const BOARD_SHORT = makeBoard(SHORT_TOTAL);
+
+  // Centre spinner shares the board's segments — same angles, same colours — so
+  // the inner wheel lines up radially with the outer ring and reads as one
   // continuous board. A handful of those segments pay out; nothing marks them,
   // so a spin gives nothing away until the reveal.
-  const SPIN_SLICES = TOTAL;                       // aligned with the board
-  const SPIN_BONUS = { 5: 1, 14: 1, 23: 1, 33: 1, 42: 1, 11: 2, 29: 2 };
+  // Each board carries its own paying slices at roughly the same odds: the short
+  // game has half the turns, so it needs a slightly richer wheel to land a
+  // bonus at all.
+  const SPIN_BONUS = { 5: 1, 14: 1, 23: 1, 33: 1, 42: 1, 11: 2, 29: 2 };          // 7 of 48
+  const SPIN_BONUS_SHORT = { 3: 1, 12: 1, 20: 1, 8: 2 };                          // 4 of 24
   const SPIN_LABEL = { 0: "No bonus", 1: "+1 place", 2: "+2 places" };
 
-  // [{ i, a0, sweep, cat, places }] — angles identical to BOARD[i]
-  const spinnerLayout = (function () {
-    const sweep = 360 / SPIN_SLICES, out = [];
-    for (let i = 0; i < SPIN_SLICES; i++) {
-      out.push({ i, a0: i * sweep, sweep, cat: BOARD[i].cat, places: SPIN_BONUS[i] || 0 });
+  // Everything that depends on how big the board is, bundled per board so a
+  // session can hand the whole set around by length.
+  function makeGeom(board, bonus) {
+    const slices = board.length;
+    const sweep = 360 / slices;
+    // [{ i, a0, sweep, cat, places }] — angles identical to board[i]
+    const spinnerLayout = [];
+    for (let i = 0; i < slices; i++) {
+      spinnerLayout.push({ i, a0: i * sweep, sweep, cat: board[i].cat, places: bonus[i] || 0 });
     }
-    return out;
-  })();
-
-  // Odds are simply how many paying segments there are.
-  const SPINNER = [0, 1, 2].map(p => {
-    const n = spinnerLayout.filter(x => x.places === p).length;
-    return { places: p, label: SPIN_LABEL[p], slices: n, chance: n / SPIN_SLICES };
-  });
-
-  // Land on a segment; that segment IS the outcome.
-  function spin() {
-    const seg = spinnerLayout[Math.floor(Math.random() * spinnerLayout.length)];
+    // Odds are simply how many paying segments there are.
+    const SPINNER = [0, 1, 2].map(p => {
+      const n = spinnerLayout.filter(x => x.places === p).length;
+      return { places: p, label: SPIN_LABEL[p], slices: n, chance: n / slices };
+    });
+    // Land on a segment; that segment IS the outcome.
+    function spin() {
+      const seg = spinnerLayout[Math.floor(Math.random() * spinnerLayout.length)];
+      return {
+        kind: seg.places ? "win" + seg.places : "none",
+        label: SPIN_LABEL[seg.places],
+        places: seg.places,
+        slice: seg.i,
+        angle: seg.a0 + seg.sweep / 2,
+      };
+    }
+    const spaceAt = pos => board[Math.max(0, Math.min(board.length - 1, pos | 0))];
     return {
-      kind: seg.places ? "win" + seg.places : "none",
-      label: SPIN_LABEL[seg.places],
-      places: seg.places,
-      slice: seg.i,
-      angle: seg.a0 + seg.sweep / 2,
+      BOARD: board, WIN_POS: board.length, TOTAL: board.length,
+      SPIN_SLICES: slices, SPIN_BONUS: bonus, spinnerLayout, SPINNER, spin,
+      spaceAt,
+      catAt: pos => spaceAt(pos).cat,
+      isSpade: pos => !!spaceAt(pos).spade,
+      isSpinner: pos => !!spaceAt(pos).spinner,
     };
   }
+
+  const GEOM = {
+    48: makeGeom(BOARD, SPIN_BONUS),
+    24: makeGeom(BOARD_SHORT, SPIN_BONUS_SHORT),
+  };
+  // Lengths a host can choose, longest first is deliberate: the full game is the
+  // default and sits at the top of the list.
+  const LENGTHS = [
+    { spaces: 48, label: "Full game", note: "48 spaces · about 40 min" },
+    { spaces: 24, label: "Quick game", note: "24 spaces · about 20 min" },
+  ];
+  // Anything unrecognised (old sessions written before this existed) is a full game.
+  const boardFor = len => GEOM[+len === 24 ? 24 : 48];
 
   // Team colours deliberately avoid the board's palette (cyan, green, red,
   // yellow, orange, royal blue, purple, white) so pieces never read as a slice:
@@ -97,27 +133,61 @@
     { c1: "#12A8A8", c2: "#05595C", name: "Petrol" },
   ];
 
-  const spaceAt = pos => BOARD[Math.max(0, Math.min(BOARD.length - 1, pos | 0))];
-  const catAt = pos => spaceAt(pos).cat;
-  const isSpade = pos => !!spaceAt(pos).spade;
-  const isSpinner = pos => !!spaceAt(pos).spinner;
-
   // Words of one category from a deck of {badge, title} cards.
   function wordsFor(cards, cat) {
     const want = String(cat || "").toUpperCase();
     return (cards || []).filter(c => c && c.title && String(c.badge || "").toUpperCase() === want).map(c => c.title);
   }
+
+  // Deterministic shuffle. Every phone and the board derive the word from the
+  // same pointer, so they must all shuffle a category into the SAME order — a
+  // plain Math.random() shuffle would show four players four different words.
+  // The seed is stored on the game state, so a new game reorders every category
+  // and a group playing twice on one deck never gets the same run of words.
+  function hashStr(s) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h >>> 0;
+  }
+  function shuffled(arr, seedNum) {
+    const a = arr.slice();
+    let s = seedNum >>> 0;
+    const rnd = () => {
+      s = (s + 0x6D2B79F5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const v = a[i]; a[i] = a[j]; a[j] = v; }
+    return a;
+  }
+  const poolCache = new Map();
+
   // SPADE is a control turn on any subject, so it draws from everything.
   // Also falls back to the whole deck if a category has no words.
-  function poolFor(cards, cat) {
-    if (String(cat).toUpperCase() === "SPADE") return (cards || []).filter(c => c && c.title).map(c => c.title);
-    const w = wordsFor(cards, cat);
-    return w.length ? w : (cards || []).filter(c => c && c.title).map(c => c.title);
+  // Pass the game's seed to get that game's shuffled order (cached — this is
+  // called on every render).
+  function poolFor(cards, cat, seed) {
+    const all = () => (cards || []).filter(c => c && c.title).map(c => c.title);
+    let base;
+    if (String(cat).toUpperCase() === "SPADE") base = all();
+    else { const w = wordsFor(cards, cat); base = w.length ? w : all(); }
+    if (seed === undefined || seed === null || seed === "") return base;
+    const key = seed + "|" + cat + "|" + base.length;
+    if (!poolCache.has(key)) {
+      if (poolCache.size > 64) poolCache.clear();
+      poolCache.set(key, shuffled(base, hashStr(key)));
+    }
+    return poolCache.get(key);
   }
 
   window.WORDSMASH = {
-    CATEGORIES, CYCLE, BOARD, WIN_POS, TOTAL, TURN_SECONDS,
-    SPINNER, SPIN_SLICES, SPIN_BONUS, spinnerLayout, TEAM_COLORS,
-    spaceAt, catAt, isSpade, isSpinner, spin, wordsFor, poolFor,
+    CATEGORIES, CYCLE, TURN_SECONDS, TEAM_COLORS,
+    // the full board's geometry stays on the root, so anything that never asked
+    // about length keeps working and keeps getting the 48 board
+    ...GEOM[48],
+    LENGTHS, boardFor,
+    wordsFor, poolFor,
   };
 })();

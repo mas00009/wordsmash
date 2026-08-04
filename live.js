@@ -64,6 +64,7 @@
     $("liveView").classList.remove("game");
     $("liveView").classList.remove("vid");
     const bg = $("joinBg"); if (bg) bg.pause();     // don't decode it off-screen
+    dropUndo();
     if (typeof syncHomeMark === "function") syncHomeMark();
     if (typeof setHeaderClose === "function") setHeaderClose(null);
   };
@@ -83,11 +84,34 @@
 
   const title = t => { if (typeof setPageTitle === "function") setPageTitle(t); };
 
+  // ---------- server clock ----------
+  // The turn deadline is an absolute timestamp written by one phone and read by
+  // every other phone and the TV. Phone and laptop clocks can sit seconds apart,
+  // which showed the room two different countdowns. So we take the Worker's
+  // clock as the only clock: every response carries `now`, and we keep the
+  // reading from the fastest round-trip we've seen (the least guesswork about
+  // how much of the trip was outbound).
+  let skew = 0, skewRtt = Infinity;
+  function noteServerTime(serverNow, t0, t1) {
+    if (!serverNow) return;
+    const rtt = t1 - t0;
+    if (rtt > skewRtt + 40) return;             // an obviously slower sample
+    skewRtt = rtt;
+    skew = serverNow - (t0 + rtt / 2);          // assume the trip split evenly
+  }
+  // Use everywhere a turn deadline is written or read. Falls back to the device
+  // clock until the first response lands, and if the Worker is old enough not to
+  // send `now` the skew simply stays 0 and nothing changes.
+  const srvNow = () => Date.now() + skew;
+
   async function api(path, method, body) {
     if (demo) return localApi(path, method, body);
+    const t0 = Date.now();
     const r = await fetch(API_BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
     if (!r.ok) { const j = await r.json().catch(() => ({})); const e = new Error(j.error || ("error " + r.status)); e.status = r.status; throw e; }
-    return r.json();
+    const j = await r.json();
+    if (j && j.now) noteServerTime(j.now, t0, Date.now());
+    return j;
   }
 
   // ---------- local mock backend (demo mode) ----------
@@ -141,10 +165,22 @@
   const amDescriber = () => describerId() === userId;
   const myTeamIdx = () => { const t = teams(); for (let i = 0; i < t.length; i++) if ((t[i].members || []).includes(userId)) return i; return -1; };
 
+  // The board this game is played on: the full 48 or the short 24, whichever
+  // the host chose. Old sessions have no boardLen and get the full board.
+  const B = () => M().boardFor(S && S.state && S.state.boardLen);
+  // The pointer the live undo offer belongs to, or -1 for no offer. The offer
+  // only stands for that one word on that one turn: it must not survive into
+  // the next team's turn, which is what an offer left on screen would do.
+  let undoAt = -1;
+  const dropUndo = () => { undoAt = -1; if (typeof hideUndo === "function") hideUndo(); };
+
+  // How many skips the describer gets in a turn (0 = none at all).
+  const skipCap = () => { const n = S && S.state && S.state.skipsPerTurn; return n === undefined || n === null ? 1 : Math.max(0, n | 0); };
+
   // Word pool for the current category, and the current word
   function currentPool() {
     const st = S.state;
-    return M().poolFor(S.deck, st.cat || "OBJECT");
+    return M().poolFor(S.deck, st.cat || "OBJECT", st.seed);
   }
   function currentWord() {
     const pool = currentPool();
@@ -155,10 +191,27 @@
   // ---------- lifecycle ----------
   const writePlayer = () => api(`/api/session/${liveCode}/entry`, "POST", { player: userId, kind: "player", data: { name: myName || "Player" } });
 
+  // Host's game settings, set in the menu and baked into the room when it's
+  // created — everyone in the room plays the host's game, and changing the
+  // setting later can't move the finish line of a game already running.
+  function gameSettings() {
+    const len = +localStorage.getItem("masgames_boardlen");
+    const sk = localStorage.getItem("masgames_skips");
+    return {
+      boardLen: len === 24 ? 24 : 48,
+      skipsPerTurn: sk === null || sk === "" ? 1 : Math.max(0, Math.min(9, +sk | 0)),
+    };
+  }
+
   function freshState() {
+    const g = gameSettings();
     return { rev: 1, phase: "lobby", flow: "wordsmash", game: "wordsmash",
       teams: [], activeTeam: 0, cat: "OBJECT", ptr: 0, correct: 0,
       turnActive: false, timerEnds: 0, turnSeconds: M().TURN_SECONDS, clearSeq: 0,
+      boardLen: g.boardLen, skipsPerTurn: g.skipsPerTurn, skipsUsed: 0,
+      // reshuffles every category for this game only, so the same deck never
+      // deals the same run of words twice
+      seed: Math.random().toString(36).slice(2, 10),
       control: null, spinResult: null, fromSpade: false };
   }
 
@@ -288,17 +341,18 @@
     if (bad.length) { showToast("Every team needs at least one player."); setTimeout(hideToast, 2400); return; }
     await mutate(st => {
       st.phase = "play"; st.activeTeam = 0; st.correct = 0; st.turnActive = false; st.timerEnds = 0;
-      st.cat = M().catAt(st.teams[0].pos | 0);
-      st.ptr = Math.floor(Math.random() * 999);
+      st.cat = B().catAt(st.teams[0].pos | 0);
+      // the pool is shuffled per game now, so the run starts at its own start
+      st.ptr = 0;
       return st;
     });
   }
 
   // ---------- play ----------
   const startTurn = () => { buzz(15); return mutate(st => {
-    st.turnActive = true; st.correct = 0; st.spinResult = null;
-    st.timerEnds = Date.now() + (st.turnSeconds || 60) * 1000;
-    st.cat = M().catAt((st.teams[(st.activeTeam || 0) % st.teams.length].pos) | 0);
+    st.turnActive = true; st.correct = 0; st.spinResult = null; st.skipsUsed = 0;
+    st.timerEnds = srvNow() + (st.turnSeconds || M().TURN_SECONDS) * 1000;
+    st.cat = B().catAt((st.teams[(st.activeTeam || 0) % st.teams.length].pos) | 0);
     st.clearSeq = (st.clearSeq || 0) + 1;
     return st;
   }); };
@@ -306,21 +360,57 @@
   const gotIt = () => { buzz(20); FX.burst(0.5, 0.72, 18, 4.5); myStrokes = []; return mutate(st => {
     st.correct = (st.correct || 0) + 1; st.ptr = (st.ptr || 0) + 1;
     st.clearSeq = (st.clearSeq || 0) + 1; return st;
+  }).then(ok => {
+    // tie the offer to the word it was made for, so a skip or another Got it in
+    // the meantime can't be the thing that gets taken back
+    // Only the describer can take one back, and in solo the bots call this too.
+    // The turn check matters because this lands a round-trip late: by now the
+    // turn may already have been ended, and an offer to undo it would be a lie.
+    if (!ok || !amDescriber() || !S.state.turnActive) return ok;
+    undoAt = S.state.ptr;
+    if (typeof showUndo === "function") showUndo("Counted it", () => undoGotIt(undoAt));
+    return ok;
   }); };
 
-  const passWord = () => { myStrokes = []; return mutate(st => {
-    st.ptr = (st.ptr || 0) + 1; st.clearSeq = (st.clearSeq || 0) + 1; return st;
+  // A fat thumb on "Got it" banks a point and burns a word, and until now there
+  // was no way back. Offered for a few seconds after the tap, and only while the
+  // same turn is still on the same word.
+  const undoGotIt = at => { buzz(15); dropUndo(); return mutate(st => {
+    if (!st.turnActive || !(st.correct > 0) || st.ptr !== at) return null;
+    st.correct -= 1; st.ptr = Math.max(0, (st.ptr || 0) - 1);
+    st.clearSeq = (st.clearSeq || 0) + 1; return st;
   }); };
+
+  const passWord = () => {
+    const cap = skipCap(), used = (S.state.skipsUsed || 0);
+    if (used >= cap) {
+      showToast(cap ? "That's your skip gone. Keep going!" : "No skips in this game. Keep going!");
+      setTimeout(hideToast, 1800); buzz(35); return Promise.resolve();
+    }
+    myStrokes = [];
+    dropUndo();
+    return mutate(st => {
+      st.skipsUsed = (st.skipsUsed || 0) + 1;
+      st.ptr = (st.ptr || 0) + 1; st.clearSeq = (st.clearSeq || 0) + 1; return st;
+    });
+  };
 
   // End of turn, following the real rules:
   //  1. move forward 1 space per correct answer
   //  2. landing on an orange/red (Action/Random) segment -> spin for bonus places
   //  3. reaching/passing FINISH -> a control turn you must win to take the game
   //  4. if the next team is sitting on a white spade -> their turn is a control turn
-  async function endTurn() {
+  // `expectEnds` guards the automatic time-up path: several devices can race to
+  // end the same turn, and the loser of that race retries against fresh state,
+  // which would end the NEXT team's turn too. Pass the deadline you saw and the
+  // mutation drops out if the turn has already moved on. Manual End presses pass
+  // nothing, so the host can always force a turn along.
+  async function endTurn(expectEnds) {
     if (acting) return; acting = true;
+    dropUndo();
     await mutate(st => {
-      const W = M(), n = st.teams.length;
+      if (expectEnds && st.timerEnds !== expectEnds) return null;
+      const W = B(), n = st.teams.length;
       const i = (st.activeTeam || 0) % n, t = st.teams[i];
       st.spinResult = null; st.fromSpade = false;
       t.pos = (t.pos | 0) + (st.correct || 0);
@@ -365,6 +455,7 @@
       if (c.mode === "finish" && teamIdx === c.team) { st.phase = "over"; st.control = null; return st; }
       st.phase = "play"; st.control = null;
       st.activeTeam = teamIdx;
+      st.skipsUsed = 0;
       const t = st.teams[teamIdx];
       // A spade is "any category", so pick one for their turn.
       st.cat = W.CYCLE[Math.floor(Math.random() * W.CYCLE.length)];
@@ -380,10 +471,13 @@
   function renderLive() {
     if (liveMode !== "session" || !S) return;
     const st = S.state;
-    const key = [st.phase, (st.control && st.control.mode) || "", activeTeamIdx(), st.turnActive, amDescriber(), st.cat, st.ptr, st.clearSeq, teams().length, st.teams.map(t => (t.members || []).length).join(",")].join("|");
+    const key = [st.phase, (st.control && st.control.mode) || "", activeTeamIdx(), st.turnActive, amDescriber(), st.cat, st.ptr, st.clearSeq, st.skipsUsed, teams().length, st.teams.map(t => (t.members || []).length).join(",")].join("|");
     if (key !== lastKey) {
       // a banner mid-pop straddling a screen change reads as a glitch
       if (lastKey && lastKey.split("|")[0] !== st.phase && window.FX && FX.soften) FX.soften();
+      // an undo offer only stands for the word, turn and describer it was made
+      // for; anything else moving on retires it
+      if (undoAt >= 0 && (!st.turnActive || st.ptr !== undoAt || !amDescriber())) dropUndo();
       build(); lastKey = key;
     }
     updateDynamic();
@@ -432,6 +526,14 @@
     return buildPlay();
   }
 
+  // One line telling the room what they're in for, so nobody is surprised
+  // 20 minutes in that there are 24 more spaces to go.
+  function gameBlurb() {
+    const len = B().WIN_POS, cap = skipCap();
+    return (len === 24 ? "Quick game · 24 spaces" : "Full game · 48 spaces")
+      + " · " + (cap === 0 ? "no skips" : cap === 1 ? "one skip a turn" : cap + " skips a turn");
+  }
+
   // ---------- lobby (live only — solo has nothing to share) ----------
   function buildLobby() {
     title(""); tint();
@@ -442,6 +544,7 @@
       ${head("Game lobby", isHost ? "Share this code, then set up the teams" : "You're in, waiting for the host")}
       <div class="gs-body">
         <div class="roomcode">${cells}</div>
+        <p class="gs-note">${esc(gameBlurb())}</p>
         <div class="gpanel"><h4>In the room</h4><div class="whos" id="livePlayers"></div></div>
         <div class="gpanel"><h4>Your name</h4>
           <input class="tname" id="myNameInp" value="${esc(myName)}" style="width:100%" /></div>
@@ -590,7 +693,7 @@
             amDescriber() ? (st.turnActive ? "Your turn · describe!" : "Your turn · you describe")
             : mine === ti ? (st.turnActive ? "Your turn · shout answers!" : "Your team is up")
             : esc(t.name) + (st.turnActive ? " are playing" : " are up next")
-          }</b><small>${(t.pos | 0) + 1} / ${M().WIN_POS}</small>
+          }</b><small>${(t.pos | 0) + 1} / ${B().WIN_POS}</small>
         </div>
       </div>
       <div class="gs-body mid">
@@ -604,9 +707,17 @@
 
     const foot = $("liveFoot");
     if (me && !st.turnActive) foot.innerHTML = `<button class="gbtn" id="startTurnBtn">Start my turn ${svg(ICON.play, 1.6)}</button>`;
-    else if (me) foot.innerHTML = `<button class="gbtn" id="gotBtn">Got it ${svg(ICON.check)}</button>
-        <button class="gbtn ghost" id="passBtn">Skip</button>
+    else if (me) {
+      // Skips are rationed. The button keeps its place once they're gone (a row
+      // that reflows under a moving thumb costs someone a card) but reads spent,
+      // and says how many are left when there's more than one.
+      const cap = skipCap(), left = Math.max(0, cap - (st.skipsUsed || 0));
+      const skipBtn = cap === 0 ? ""
+        : `<button class="gbtn ghost${left ? "" : " spent"}" id="passBtn">Skip${cap > 1 ? " " + left : ""}</button>`;
+      foot.innerHTML = `<button class="gbtn" id="gotBtn">Got it ${svg(ICON.check)}</button>
+        ${skipBtn}
         <button class="gbtn ghost" id="endBtn">End</button>`;
+    }
     else if (solo) foot.innerHTML = `<div class="gbtn wait">${esc(nameOf(describerId()))} is playing…</div>`;
     else foot.innerHTML = isHost
       ? `<button class="gbtn ghost" id="hostEnd" style="flex:1">End turn</button><button class="gbtn ghost" id="hostOver">Finish</button>`
@@ -634,7 +745,7 @@
     const owner = T[c.team % T.length];
     const isFinish = c.mode === "finish";
     title(""); tint();
-    const pool = W.poolFor(S.deck, "SPADE");
+    const pool = W.poolFor(S.deck, "SPADE", st.seed);
     const word = pool[(st.ptr || 0) % Math.max(1, pool.length)] || "…";
     const cvars = "--c1:#f2f6ff;--c2:#c9d6ee;--ink:#0B0F17";
 
@@ -709,7 +820,7 @@
   function scoreStrip() {
     const T = teams(), ti = activeTeamIdx();
     return T.map((t, i) => i === ti
-      ? `<span class="tb on" style="${teamVars(i)}"><i></i><b>${esc(t.name)}</b><small>${(t.pos | 0) + 1} / ${M().WIN_POS}</small></span>`
+      ? `<span class="tb on" style="${teamVars(i)}"><i></i><b>${esc(t.name)}</b><small>${(t.pos | 0) + 1} / ${B().WIN_POS}</small></span>`
       : `<span class="tb" style="${teamVars(i)}"><i></i><b>${t.pos | 0}</b></span>`).join("");
   }
 
@@ -757,9 +868,10 @@
     if (liveMode !== "session" || !S) return;
     if (solo) soloBots();
     const st = S.state, el = $("liveTimer"), ring = $("ring"), prg = $("ringPrg");
+    const now = srvNow();
     if (el && st.timerEnds) {
-      const total = Math.max(1000, (st.turnSeconds || 30) * 1000);
-      const left = Math.max(0, st.timerEnds - Date.now());
+      const total = Math.max(1000, (st.turnSeconds || M().TURN_SECONDS) * 1000);
+      const left = Math.max(0, st.timerEnds - now);
       const rem = Math.ceil(left / 1000);
       el.textContent = rem;
       if (ring) {
@@ -770,14 +882,18 @@
       if (prg) prg.style.strokeDashoffset = (RING_C * (1 - left / total)).toFixed(1);
     }
     // Time's up: every phone in the room buzzes once, and the describer's device
-    // is the one that actually ends the turn.
-    if (st.phase === "play" && st.turnActive && st.timerEnds && Date.now() >= st.timerEnds) {
+    // is the one that actually ends the turn. If that phone has locked, gone to
+    // sleep or dropped off, the clock would sit on zero forever, so the job
+    // passes on: the host picks it up shortly after, then anyone still watching.
+    // Whoever gets there first wins the compare-and-set and the rest no-op.
+    if (st.phase === "play" && st.turnActive && st.timerEnds && now >= st.timerEnds) {
       if (timeUpKey !== st.timerEnds) {
         timeUpKey = st.timerEnds;
         buzz([220, 90, 220, 90, 450]);
         showToast("⏰ Time!"); setTimeout(hideToast, 1800);
       }
-      if (amDescriber() || (solo && isHost)) endTurn();
+      const late = now - st.timerEnds;
+      if (amDescriber() || (solo && isHost) || (isHost && late > 3000) || late > 6000) endTurn(st.timerEnds);
     }
     if (st.cat === "DRAW" && amDescriber() && st.turnActive && drawDirty && Date.now() - lastUpload > 900) uploadDraw();
   }, 300);

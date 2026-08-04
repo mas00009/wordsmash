@@ -156,6 +156,10 @@
 <script>
 const $ = id => document.getElementById(id);
 const M = window.WORDSMASH;
+// Board geometry for whichever game this room is playing: the full 48 or the
+// short 24. The whole board is drawn from BOARD.length, so a shorter board is
+// just fewer, wider slices around the same ring.
+const G = () => M.boardFor(S && S.state && S.state.boardLen);
 const qs = new URLSearchParams(location.search);
 const CODE = (qs.get("code") || qs.get("board") || "").toUpperCase();
 // Board view is read-only: it just polls the same session the phones use.
@@ -394,11 +398,12 @@ function pawn(x, y, ti) {
 function drawBoard() {
   const teams = (S && S.state.teams) || [];
   const active = S ? (S.state.activeTeam || 0) : -1;
-  const n = M.BOARD.length, step = 360 / n;
+  const BD = G().BOARD;
+  const n = BD.length, step = 360 / n;
   const finTip = pt((n - 0.5) * step, R_OUT);   // rim end of the finish slice's spoke
   let wedges = "", labels = "", toks = "", marks = "";
 
-  M.BOARD.forEach((sp, i) => {
+  BD.forEach((sp, i) => {
     const C = M.CATEGORIES[sp.cat];
     const a0 = i * step, a1 = a0 + step, mid = a0 + step / 2;
     const last = i === n - 1;
@@ -521,7 +526,7 @@ function drawBoard() {
   const res0 = (S && S.state.spinResult) || null;
   const winNeon = res0 && res0.places === 2 ? "#00FFC6" : "#00E5FF";
   // same gradients and same angles as the outer wedges, so the colours line up
-  const rays = M.spinnerLayout.map(sg =>
+  const rays = G().spinnerLayout.map(sg =>
     `<path d="${arc(sg.a0 + 0.35, sg.sweep - 0.7, R_SPIN)}" fill="url(#g${sg.cat})"/>`
   ).join("");
 

@@ -14,12 +14,23 @@ The board and rules follow the real **Articulate!** (Drumond Park), with our **D
 | Movement | **1 space per correct answer** |
 | Next category | Set by the space you **land on** |
 | ♠ Spade (white) | **Control turn** — describe to *everyone*; the first team to guess **takes the turn** (then plays any category) |
-| 🎯 Spinner | Landing on an **Action (orange)** or **Random (red)** segment spins the centre wheel. It has **28 slices** in the board's colours; **4 are shiny diamonds** that pay out. The needle spins and **the slice it lands on is the result**: +1 place (3 slices, ~11%), +2 places (1 slice, ~4%), otherwise nothing (~86%). Those board spaces carry a ⟳ spin icon. |
+| 🎯 Spinner | Landing on an **Action (orange)** or **Random (red)** segment spins the centre wheel. It shares the board's segments and colours, so the inner wheel lines up radially with the outer ring. Nothing marks the paying slices — the needle spins and **the slice it lands on is the result**. Full board: +1 place (5 of 48, ~10%), +2 places (2 of 48, ~4%). Quick board: +1 (3 of 24, ~13%), +2 (1 of 24, ~4%) — a touch richer because there are half as many turns to land one. Those board spaces carry a ⟳ spin icon. |
 | Draw | Describer **sketches** on a canvas that syncs to every phone |
 | Finish | Reaching/passing **FINISH** triggers a control turn — **you must win it to win**, otherwise you stay there and retry next turn. On the board it's the only cyan→purple space, capped with a chequered flag |
-| ⏰ Time | At 0:00 the board buzzes and shows **TIME'S UP!**; every phone in the room vibrates and the describer's phone ends the turn |
+| ⏭ Skip | **Rationed** — 1 per turn by default (0–3 in **⚙ → Game settings**). A spent skip stays in the row, dimmed, so the button under your thumb never moves mid-turn |
+| ↩️ Undo | **Got it** offers a 4-second **Undo** pill. It only stands for that word, that turn, that describer; a skip, another Got it, or the turn ending retires it |
+| ⏰ Time | At 0:00 the board buzzes and shows **TIME'S UP!**; every phone in the room vibrates and the describer's phone ends the turn. If that phone has locked or dropped off, the **host's** device ends it 3s later and **anyone's** at 6s, so the room is never stuck on a dead clock |
 
-Board: **48 segments** in a circular ring around the centre spinner, with a spade every 8th space, inside a rainbow neon bezel. Rendered as SVG so it scales to a TV.
+Board: **two of them**, chosen by the host in **⚙ → Game settings** before the room is created.
+
+| Length | Segments | Spades | Spinner | Roughly |
+|---|---|---|---|---|
+| **Full** | 48 | 6 (every 8th) | 7 paying slices of 48 | 40 min |
+| **Quick** | 24 | 3 (every 8th) | 4 paying slices of 24 | 20 min |
+
+Both are built by the same rule (seven categories, then a white spade to close the lap) so the quick board keeps the full board's rhythm rather than being a truncated one, and each carries its own spinner at matching odds. They're separate arrays: changing one can't move the other one's finish line. The board view reads `state.boardLen` and draws whichever it is — fewer, wider slices around the same ring. A session written before this existed has no `boardLen` and gets the full board.
+
+Every ring is drawn from `BOARD.length`, inside a rainbow neon bezel, as SVG so it scales to a TV.
 
 The real game's spinner gives +2/+3; ours is tuned to +1/+2 with much lower odds so a bonus feels like a treat. The odds aren't a weighted table — they're literally how many diamond slices are on the wheel, so what you see is what you get.
 
@@ -77,7 +88,7 @@ Push to GitHub, then **Settings → Pages → deploy from branch** (`main`, root
 
 ## How to play
 
-1. **Host** taps **Host a game** → picks a deck from the list → gets a **room code + QR**. (Generating a new deck lives in **⚙ → Create a new deck**, not in the host flow.)
+1. **Host** taps **Host a game** → picks a deck from the list → gets a **room code**. (Generating a new deck lives in **⚙ → Create a new deck**, and game length/skips in **⚙ → Game settings**, not in the host flow.)
 2. Everyone else taps **📲 Join a game** and enters the code.
 3. Host taps **👥 Set up teams** — choose 2–4 teams, tap players to move them, rename teams, or auto-assign.
 4. Host opens **📺 Board view** on a TV/laptop:
@@ -90,13 +101,17 @@ The phones celebrate with the board: a spinner bonus sets off fireworks and a "+
 
 The Host/Join animated backdrop (`join-bg.webm`, one shared video element) appears in exactly four places: the Host and Join screens, solo's team-setup screen, and the winners page — mid-game turns stay on a plain backdrop so the word is the loudest thing on screen, and the video pauses whenever it's hidden. During a turn one bar carries everything: the active team as a loud named pill with its board position, the other teams as a coloured dot + position (the TV board has the full detail). The winners page is trophy, gradient name + gold "wins!", and gold/silver/bronze medal standings, with no buttons — the header ✕ leaves, like every screen. A renderer gotcha lives in the countdown-ring styling: `filter: drop-shadow` on the arc promoted a compositing layer whose square edge rendered as a visible slab, so the glow is a round `box-shadow` on the container instead.
 
+**One clock, not five.** The turn deadline is an absolute timestamp one phone writes and the whole room reads, and phone and laptop clocks sit seconds apart in practice. So every Worker response carries `now`, each client keeps the reading from its fastest round-trip, and all countdowns are drawn from that shared clock. A device 7 seconds fast shows the same number as everyone else instead of running the turn out early.
+
+**No repeats between games.** Each category is shuffled deterministically from a per-game `seed` on the state, so every phone and the board derive the same word from the same pointer, and the same deck never deals the same run of words twice. Before this, only the starting offset was random and the order was fixed, so a second game replayed the first.
+
 There is no card-by-card player: the phone-as-deck mode (with its round timer and standalone scoreboard) was from before the board game existed and has been removed. Picking a deck selects it and shows **All cards**; playing happens in a live room.
 
 ## Your crew's vibe
 
 A persistent crew profile (*Aussie, born early '80s, love American pop culture*) is mixed into every AI-generated deck. It has no menu editor any more — it lives in `DEFAULT_GROUP` / `localStorage`. **Theme** is the per-deck topic on top of that.
 
-The menu is **🃏 Decks**, **♻️ Reset game** and **🔑 AI key** — Decks expands in place rather than opening a separate page. Expanding Decks lists the 10 built-in decks. **✨ Create a new deck** is a free-text brief plus Difficulty and Audience — format and card count aren't settings: every card is a Word Smash word across all 7 categories, and every deck is **210 cards** (30 per category), generated in 2 batches of 105. Picking a deck opens **All cards** so you can review it before hosting.
+The menu is **🃏 Decks**, **🕐 Game settings**, **✨ Create a new deck**, **♻️ Reset game** and **🔑 AI key** — sections expand in place rather than opening a separate page. **Game settings** is game length (Full 48 / Quick 24) and skips per turn (0–3). They live in `localStorage` on the host's device and are **baked into the room state when it's created**, so everyone plays the host's game and changing a setting can never move the finish line of a game already running. The lobby prints the terms under the room code ("QUICK GAME · 24 SPACES · ONE SKIP A TURN") so nobody is surprised 20 minutes in. Expanding Decks lists the 10 built-in decks. **✨ Create a new deck** is a free-text brief plus Difficulty and Audience — format and card count aren't settings: every card is a Word Smash word across all 7 categories, and every deck is **210 cards** (30 per category), generated in 2 batches of 105. Picking a deck opens **All cards** so you can review it before hosting.
 
 ## Files
 

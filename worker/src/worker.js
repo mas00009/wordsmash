@@ -20,8 +20,12 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Max-Age": "86400",
 };
+// Every response carries the server's clock. The turn deadline is an absolute
+// timestamp one phone writes and the whole room reads, and phone/laptop clocks
+// drift apart by seconds — so the clients steer by this instead of their own.
 function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", ...CORS } });
+  const body = data && typeof data === "object" && !Array.isArray(data) ? { ...data, now: Date.now() } : data;
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...CORS } });
 }
 function shortId(n = 8) {
   const a = "23456789abcdefghijkmnpqrstuvwxyz";
