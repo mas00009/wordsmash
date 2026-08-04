@@ -26,16 +26,19 @@ LW, LH = logo.size
 
 
 def plate(size):
-    """Dark minimal tile — matches an iOS home screen of dark glyph icons.
-    Near-black with only a whisper of a centre highlight so it isn't dead flat."""
-    img = Image.new("RGB", (size, size), (16, 18, 23))
+    """iOS dark-mode icon tile: the same neutral charcoal gradient Apple paints
+    behind dark icons (X, Tesla, ChatGPT...), so the icon sits in the set —
+    top edge slightly lighter, falling to a deeper charcoal at the base."""
+    img = Image.new("RGB", (size, size))
     px = img.load()
+    top, bot = (52, 52, 56), (30, 30, 33)
     for y in range(size):
+        t = y / (size - 1)
+        r = int(top[0] + (bot[0] - top[0]) * t)
+        g = int(top[1] + (bot[1] - top[1]) * t)
+        b_ = int(top[2] + (bot[2] - top[2]) * t)
         for x in range(size):
-            r, g, b = px[x, y]
-            d = math.hypot((x - size * 0.5) / size, (y - size * 0.42) / size)
-            h = max(0.0, 1.0 - d * 2.1) ** 2 * 0.06
-            px[x, y] = (min(255, int(r + 26 * h)), min(255, int(g + 30 * h)), min(255, int(b + 40 * h)))
+            px[x, y] = (r, g, b_)
     return img.convert("RGBA")
 
 
