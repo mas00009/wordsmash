@@ -214,11 +214,14 @@ window.BUILTIN_DECKS = (function () {
         "Painting a wall","Hammering a nail","Hanging a picture","Assembling flat-pack","Reading the meter",
         "Sorting recycling","Cleaning windows","Wiping benches","Feeding the pet","Scrubbing the shower",
         "Changing sheets","Putting up shelves"],
-      PERSON: ["Martha Stewart","Marie Kondo","Scott Cam","Jamie Durie","Shaynna Blaze","Neale Whitaker",
-        "Darren Palmer","Barry Du Bois","Costa Georgiadis","Don Burke","Peter Cundall","Andrew Winter",
-        "Johanna Griggs","Graham Ross","Dr Harry Cooper","Mrs Hinch","Kirstie Allsopp","Phil Spencer",
-        "Kevin McCloud","Laurence Llewelyn-Bowen","Ty Pennington","Chip Gaines","Joanna Gaines","Tan France",
-        "Jonathan Van Ness","Tim Allen","Kim Woodburn","Charlie Albone","Adam Dovile","Sarah Beeny"],
+      // Broad household names rather than renovation specialists: the faces that
+      // are literally in your living room every night, which keeps a thread to
+      // the deck without needing 30 famous plumbers.
+      PERSON: ["Martha Stewart","Marie Kondo","Scott Cam","Shaynna Blaze","Don Burke","Costa Georgiadis",
+        "Johanna Griggs","Dr Harry Cooper","Karl Stefanovic","Lisa Wilkinson","Eddie McGuire","Rove McManus",
+        "Hamish Blake","Andy Lee","Carrie Bickmore","Waleed Aly","Shaun Micallef","Magda Szubanski",
+        "Bert Newton","Daryl Somers","Molly Meldrum","Ray Martin","Tracy Grimshaw","David Attenborough",
+        "Oprah Winfrey","Bear Grylls","Gordon Ramsay","Jamie Oliver","Ellen DeGeneres","Graham Norton"],
       WORLD:  ["Kitchen","Bathroom","Garage","Attic","Basement","Backyard","Hallway","Laundry","Pantry",
         "Spare room","Front porch","Shed","Balcony","Driveway","Letterbox","Garden path","Rooftop","Staircase",
         "Cupboard under the stairs","Linen closet","Nursery","Study","Sunroom","Deck","Carport","Courtyard","Loft",
