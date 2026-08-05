@@ -122,7 +122,8 @@ The menu is **🃏 Decks**, **🕐 Game settings**, **✨ Create a new deck**, *
 | `index.html` | The phone app (UI + logic) |
 | `wordsmash.js` | Board + category definitions (shared by app and board view) |
 | `live.js` | Live multiplayer: rooms, polling sync, turn flow, team setup, drawing, local demo |
-| `decks.js` | 10 built-in decks. **80s & 90s, Aussie Everything and Kids Zone carry 700 words each (100 per category)**; the other seven are still 210 (30 per category) and are next in line. Plus a `blurb` and `icon` shown when you pick one to host |
+| `decks.js` | 10 built-in decks, growing to **200 words a category (1,400 a deck)**. Done: Around the House. At 100: 80s & 90s, Aussie Everything, Kids Zone. Still at 30: Movies & TV, Sports Legends, Music Icons, Food & Drink, Adults After Dark, Classic Mixed Bag. Run `node tools/deckcheck.js` for the live tally |
+| `tools/deckcheck.js` | Deck integrity check. Reports per deck and category: count, duplicates, and how many words short of target. `--fix` drops duplicates and trims overflow (it never invents words). 14,000 hand-written strings is past what anyone can keep straight by eye |
 | `board.html` | TV/laptop board display |
 | `qr.js` | Self-contained QR generator (MIT, Kazuhiko Arase) |
 | `manifest.webmanifest`, `sw.js`, `icon-*.png` | PWA / installable app assets |
