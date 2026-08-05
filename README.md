@@ -14,7 +14,7 @@ The board and rules follow the real **Articulate!** (Drumond Park), with our **D
 | Movement | **1 space per correct answer** |
 | Next category | Set by the space you **land on** |
 | ♠ Spade (white) | **Control turn** — describe to *everyone*; the first team to guess **takes the turn** (then plays any category) |
-| 🎯 Spinner | Landing on an **Action (orange)** or **Random (red)** segment spins the centre wheel. It shares the board's segments and colours, so the inner wheel lines up radially with the outer ring. Nothing marks the paying slices — the needle spins and **the slice it lands on is the result**. Full board: +1 place (5 of 48, ~10%), +2 places (2 of 48, ~4%). Quick board: +1 (3 of 24, ~13%), +2 (1 of 24, ~4%) — a touch richer because there are half as many turns to land one. Those board spaces carry a ⟳ spin icon. |
+| 🎯 Spinner | Landing on an **Action (orange)** or **Random (red)** segment spins the centre wheel. It shares the board's segments and colours, so the inner wheel lines up radially with the outer ring. Nothing marks the paying slices — the needle spins and **the slice it lands on is the result**. A payout is not applied automatically: the team that earned it chooses to **take the places, or knock that many off a rival team**. Full board: +1 place (5 of 48, ~10%), +2 places (2 of 48, ~4%). Quick board: +1 (3 of 24, ~13%), +2 (1 of 24, ~4%) — a touch richer because there are half as many turns to land one. Those board spaces carry a ⟳ spin icon. |
 | Draw | Describer **sketches** on a canvas that syncs to every phone |
 | Finish | Reaching/passing **FINISH** triggers a control turn — **you must win it to win**, otherwise you stay there and retry next turn. On the board it's the only cyan→purple space, capped with a chequered flag |
 | ⏭ Skip | **Rationed** — 1 per turn by default (0–3 in **⚙ → Game settings**). A spent skip stays in the row, dimmed, so the button under your thumb never moves mid-turn |
@@ -113,6 +113,8 @@ A persistent crew profile (*Aussie, born early '80s, love American pop culture*)
 
 The menu is **🃏 Decks**, **🕐 Game settings**, **✨ Create a new deck**, **♻️ Reset game** and **🔑 AI key** — sections expand in place rather than opening a separate page. **Game settings** is game length (Full 48 / Quick 24) and skips per turn (0–3). They live in `localStorage` on the host's device and are **baked into the room state when it's created**, so everyone plays the host's game and changing a setting can never move the finish line of a game already running. The lobby prints the terms under the room code ("QUICK GAME · 24 SPACES · ONE SKIP A TURN") so nobody is surprised 20 minutes in. Expanding Decks lists the 10 built-in decks. **✨ Create a new deck** is a free-text brief plus Difficulty and Audience — format and card count aren't settings: every card is a Word Smash word across all 7 categories, and every deck is **210 cards** (30 per category), generated in 2 batches of 105. Picking a deck opens **All cards** so you can review it before hosting.
 
+**Deck size and why it matters.** A 48-space game runs ~40 turns spread over 7 categories, so one category comes up ~6 times and, at ~6 cards a turn, a single game draws **about 40 cards out of one category**. At 30 a category the pool ran dry mid-game and started repeating — which is exactly what happened the first time it was played with a family. Expanded decks hold **100 a category (700 a deck)**, so a whole game uses under half the pool and cannot repeat.
+
 ## Files
 
 | Path | What |
@@ -120,7 +122,7 @@ The menu is **🃏 Decks**, **🕐 Game settings**, **✨ Create a new deck**, *
 | `index.html` | The phone app (UI + logic) |
 | `wordsmash.js` | Board + category definitions (shared by app and board view) |
 | `live.js` | Live multiplayer: rooms, polling sync, turn flow, team setup, drawing, local demo |
-| `decks.js` | 10 built-in decks — **210 words each** (30 per category), plus a `blurb` and `icon` shown when you pick one to host |
+| `decks.js` | 10 built-in decks. **80s & 90s, Aussie Everything and Kids Zone carry 700 words each (100 per category)**; the other seven are still 210 (30 per category) and are next in line. Plus a `blurb` and `icon` shown when you pick one to host |
 | `board.html` | TV/laptop board display |
 | `qr.js` | Self-contained QR generator (MIT, Kazuhiko Arase) |
 | `manifest.webmanifest`, `sw.js`, `icon-*.png` | PWA / installable app assets |
