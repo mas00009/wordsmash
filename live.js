@@ -500,10 +500,15 @@
   function tint(showBg) {
     const v = $("liveView");
     v.classList.add("game");
+    // Host and Join set `artbg` on the way in and nothing cleared it, so the
+    // video kept playing behind every screen of the game. In here we ARE a game
+    // screen: `vid` is the only thing that may show it (solo team setup, the
+    // winners page), and every other turn stays on the plain backdrop.
+    v.classList.remove("artbg");
     v.classList.toggle("vid", !!showBg);
     const bg = $("joinBg");
     if (showBg) playJoinBg();
-    else if (bg && !v.classList.contains("artbg")) bg.pause();
+    else if (bg) bg.pause();
     // game screens carry their own heading — drop the header mark and rule,
     // same as Host and Join
     if (typeof syncHomeMark === "function") syncHomeMark();
@@ -686,7 +691,11 @@
         </div>` + (isDraw && st.turnActive ? drawArea(false) : "");
     }
 
-    inner().innerHTML = `<div class="gs${isDraw ? " draw" : ""}">
+    // The compact draw layout (small ring, no subtitle) exists to make room for
+    // the canvas, and the canvas only appears once the turn is running. Applying
+    // it to the "You're up!" screen shrank the clock for no reason and left a
+    // hole where the canvas would be, so it's gated on the turn being live.
+    inner().innerHTML = `<div class="gs${isDraw && st.turnActive ? " draw" : ""}">
       <div class="gs-head" style="margin-bottom:15px">
         <div class="upbar ${mine === ti ? "mine" : "theirs"}" style="${teamVars(ti)}">
           <i></i><b>${

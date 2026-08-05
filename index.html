@@ -754,6 +754,17 @@
   .gs-title { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: -.6px; color: #fff;
     text-shadow: 0 4px 26px rgba(0,0,0,.6); }
   .gs-head .tagrule { margin: 10px auto 0; }
+  /* In the menu the picker shares its row with the All-cards eye, so it can't
+     carry the wide padding the full-width Host picker uses: the longer deck
+     names were being clipped to "80s & 90s No…". Host is untouched. */
+  /* Compact variant of the deck picker: in the menu it shares its row with the
+     All-cards eye, so it can't carry the wide padding the full-width Host
+     picker uses — the longer deck names were clipping to "80s & 90s No…".
+     Every built-in name now fits with the icon still clear of the text. */
+  .pickrow .pickbtn { padding-left: 14px; padding-right: 14px; gap: 10px; }
+  .pickrow .pick-label { font-size: 15px; }
+  .pickrow .eyebtn { width: 46px; flex: 0 0 46px; }
+
   .gs-sub { margin: 12px 0 0; font-size: 14px; font-weight: 700; color: #b3c0da; }
   /* the room's terms in one quiet line, under the code */
   .gs-note { margin: -4px 0 2px; text-align: center; font-size: 12px; font-weight: 800;
