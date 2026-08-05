@@ -32,6 +32,8 @@ Both are built by the same rule (seven categories, then a white spade to close t
 
 Every ring is drawn from `BOARD.length`, inside a rainbow neon bezel, as SVG so it scales to a TV.
 
+**Board audio** is synthesised in the page — no sample files, no extra request, works offline. One voice function (oscillator → filter → envelope) plus a noise source and a reverb built from a generated impulse, so a token run, a wheel spin and a win all sound like the same instrument. Sounds are written in C so overlapping events agree with each other. `createAudio(ctx, dest)` takes its context, which is how every sound is checked: render it through an `OfflineAudioContext` and assert it is audible, the right length, and not clipping — the levels are deliberately ordered so the win and the buzzer are the loudest things on the board and the one-a-second countdown tick is the quietest.
+
 The real game's spinner gives +2/+3; ours is tuned to +1/+2 with much lower odds so a bonus feels like a treat. The odds aren't a weighted table — they're literally how many diamond slices are on the wheel, so what you see is what you get.
 
 - The **host sets up teams** after players join.

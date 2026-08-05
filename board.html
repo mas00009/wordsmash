@@ -195,75 +195,234 @@ $("addCode").addEventListener("click", askForCode);
 $("soundBtn").addEventListener("click", audioReady);
 audioReady();   // reveals the unmute button if the browser is blocking us
 
-// --- time's-up buzzer -------------------------------------------------------
+// --- board audio ------------------------------------------------------------
+// Everything the board plays is synthesised here: no sample files to load, no
+// second request, works offline. The engine is built around one voice function
+// (oscillator -> filter -> envelope) plus a noise source and a reverb made from
+// a generated impulse, so the whole board sounds like one instrument rather
+// than a pile of beeps. Sounds are written in a key (C) so overlapping events
+// still agree with each other.
+//
+// createAudio() takes a context so the same engine can be rendered offline in
+// a test, which is how the sounds are checked without anyone listening.
+const NOTE = { C3:130.81, G3:196, C4:261.63, D4:293.66, Eb4:311.13, E4:329.63, F4:349.23, G4:392,
+  A4:440, Bb4:466.16, B4:493.88, C5:523.25, D5:587.33, Eb5:622.25, E5:659.25, F5:698.46, G5:784,
+  A5:880, Bb5:932.33, C6:1046.5, D6:1174.66, E6:1318.51, G6:1568, C7:2093 };
+
+function createAudio(ctx, dest) {
+  // master bus: a touch of compression so a fanfare over a token run never
+  // clips, and a reverb send that gives the room some size
+  const master = ctx.createGain(); master.gain.value = 0.85;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -14; comp.knee.value = 24; comp.ratio.value = 4;
+  comp.attack.value = 0.004; comp.release.value = 0.25;
+  master.connect(comp); comp.connect(dest);
+
+  const verb = ctx.createConvolver();
+  const rate = ctx.sampleRate, len = Math.floor(rate * 2.4);
+  const imp = ctx.createBuffer(2, len, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = imp.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      const t = i / len;
+      // a short early-reflection cluster then a smooth exponential tail
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.6) * (t < 0.02 ? 1.6 : 1);
+    }
+  }
+  verb.buffer = imp;
+  const verbLvl = ctx.createGain(); verbLvl.gain.value = 0.5;
+  verb.connect(verbLvl); verbLvl.connect(master);
+
+  const now = () => ctx.currentTime;
+  const send = (node, amt) => { if (!amt) return; const g = ctx.createGain(); g.gain.value = amt; node.connect(g); g.connect(verb); };
+
+  // one pitched voice: oscillator -> filter -> envelope
+  function voice(o) {
+    const t = now() + (o.at || 0), dur = o.dur || 0.3, vol = o.vol == null ? 0.2 : o.vol;
+    const osc = ctx.createOscillator();
+    osc.type = o.type || "sine";
+    osc.frequency.setValueAtTime(o.f, t);
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.to), t + (o.bend || dur));
+    if (o.detune) osc.detune.setValueAtTime(o.detune, t);
+    const flt = ctx.createBiquadFilter();
+    flt.type = o.ftype || "lowpass";
+    flt.frequency.setValueAtTime(o.fc || 18000, t);
+    if (o.fcTo) flt.frequency.exponentialRampToValueAtTime(Math.max(60, o.fcTo), t + dur);
+    flt.Q.value = o.q == null ? 0.8 : o.q;
+    const g = ctx.createGain();
+    const a = o.a == null ? 0.006 : o.a, hold = o.hold || 0;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + a);
+    if (hold) g.gain.setValueAtTime(vol, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(flt); flt.connect(g); g.connect(master); send(g, o.send);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+
+  // one noise burst: white noise -> filter -> envelope. Percussion, whooshes,
+  // cymbal swells and the ratchet on the wheel are all this.
+  let noiseBuf = null;
+  function noise(o) {
+    const t = now() + (o.at || 0), dur = o.dur || 0.2, vol = o.vol == null ? 0.2 : o.vol;
+    if (!noiseBuf) {
+      const n = Math.floor(ctx.sampleRate * 2);
+      noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    const flt = ctx.createBiquadFilter();
+    flt.type = o.ftype || "bandpass";
+    flt.frequency.setValueAtTime(o.fc || 1200, t);
+    if (o.fcTo) flt.frequency.exponentialRampToValueAtTime(Math.max(60, o.fcTo), t + dur);
+    flt.Q.value = o.q == null ? 1 : o.q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + (o.a == null ? 0.004 : o.a));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(flt); flt.connect(g); g.connect(master); send(g, o.send);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
+
+  // a fat stab: three detuned saws an octave apart, filter opening fast. This
+  // is the "something good just happened" sound.
+  function stab(f, at, dur, vol, sendAmt) {
+    [-9, 0, 9].forEach((cents, i) =>
+      voice({ f: i === 2 ? f * 2 : f, type: "sawtooth", detune: cents, at, dur,
+        vol: (vol || 0.16) * (i === 2 ? 0.5 : 1), a: 0.008,
+        fc: 400, fcTo: 5200, q: 1.4, send: sendAmt == null ? 0.3 : sendAmt }));
+    voice({ f: f / 2, type: "sine", at, dur: dur * 0.7, vol: (vol || 0.16) * 0.8, a: 0.004 });
+  }
+
+  // a wooden pluck, the token-moving sound
+  function pluck(f, at, vol, sendAmt) {
+    voice({ f, type: "triangle", at, dur: 0.26, vol: vol || 0.22, a: 0.002, fc: 5000, fcTo: 900, send: sendAmt == null ? 0.18 : sendAmt });
+    voice({ f: f * 2.01, type: "sine", at, dur: 0.1, vol: (vol || 0.22) * 0.35, a: 0.001 });
+    noise({ at, dur: 0.03, fc: 2600, q: 1.2, vol: 0.05 });
+  }
+
+  const SFX = {
+    // a turn begins: a whoosh up into two rising plucks and a soft sub thump
+    turnStart() {
+      noise({ dur: 0.4, fc: 300, fcTo: 4200, q: 0.9, vol: 0.09, send: 0.25 });
+      pluck(NOTE.G4, 0.16, 0.28); pluck(NOTE.C5, 0.28, 0.32);
+      voice({ f: 120, to: 70, type: "sine", dur: 0.35, vol: 0.22, a: 0.004 });
+    },
+    // one space forward per correct answer: a pentatonic run that climbs, so a
+    // five-answer turn sounds like a run up the board rather than five beeps
+    step(n) {
+      const scale = [NOTE.C5, NOTE.D5, NOTE.E5, NOTE.G5, NOTE.A5, NOTE.C6, NOTE.D6, NOTE.E6];
+      for (let i = 0; i < n; i++) pluck(scale[Math.min(i, scale.length - 1)], i * 0.115, 0.3);
+    },
+    // dragged backwards: a falling minor slide with a thud under it
+    stepBack(n) {
+      for (let i = 0; i < n; i++) {
+        const f = NOTE.G4 / Math.pow(1.19, i);
+        voice({ f, to: f * 0.62, type: "sawtooth", at: i * 0.16, dur: 0.3, vol: 0.15,
+          fc: 1600, fcTo: 300, q: 3, send: 0.3 });
+      }
+      voice({ f: 110, to: 42, type: "sine", at: n * 0.16 - 0.1, dur: 0.5, vol: 0.3, a: 0.004 });
+      noise({ at: n * 0.16 - 0.1, dur: 0.35, fc: 900, fcTo: 160, q: 0.8, vol: 0.09, send: 0.3 });
+    },
+    // last ten seconds: a clave tick that gets tighter and brighter under five
+    tick(urgent) {
+      noise({ dur: urgent ? 0.06 : 0.05, fc: urgent ? 3400 : 2400, q: 1.4, vol: urgent ? 0.55 : 0.36, send: 0.12 });
+      voice({ f: urgent ? NOTE.E6 : NOTE.C6, type: "triangle", dur: 0.12, vol: urgent ? 0.42 : 0.28, a: 0.001, send: 0.15 });
+      voice({ f: urgent ? NOTE.E5 : NOTE.C5, type: "sine", dur: 0.09, vol: urgent ? 0.14 : 0.1, a: 0.001 });
+    },
+    // time's up: a klaxon, three detuned blasts falling away, drenched in room
+    buzzer() {
+      [0, 0.32, 0.64].forEach((at, i) => {
+        const f = i === 2 ? 196 : 233;
+        [-14, 0, 14].forEach(c => voice({ f, type: "sawtooth", detune: c, at,
+          dur: i === 2 ? 0.62 : 0.26, hold: i === 2 ? 0.28 : 0.12, vol: 0.115,
+          fc: 900, fcTo: i === 2 ? 300 : 1400, q: 2.5, send: 0.35 }));
+        noise({ at, dur: i === 2 ? 0.5 : 0.2, fc: 1800, fcTo: 400, q: 0.7, vol: 0.06, send: 0.3 });
+      });
+    },
+    // the wheel: a ratchet that accelerates under a rising filtered pad
+    spinUp() {
+      let t = 0, gap = 0.075;
+      while (t < 1.9) {
+        noise({ at: t, dur: 0.035, fc: 1500 + t * 900, q: 6, vol: 0.19 });
+        gap = Math.max(0.028, gap * 0.965);
+        t += gap;
+      }
+      voice({ f: 90, to: 220, type: "sawtooth", dur: 2.0, vol: 0.15, a: 0.4,
+        fc: 250, fcTo: 3000, q: 2, send: 0.3 });
+    },
+    // it paid out: a major stab with a sparkle arpeggio over the top
+    spinWin(places) {
+      const chord = [NOTE.C5, NOTE.E5, NOTE.G5];
+      chord.forEach((f, i) => stab(f, i * 0.012, 0.7, 0.2));
+      [NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C7].slice(0, places > 1 ? 4 : 3)
+        .forEach((f, i) => voice({ f, type: "triangle", at: 0.18 + i * 0.075, dur: 0.5, vol: 0.19, a: 0.003, send: 0.45 }));
+      if (places > 1) stab(NOTE.C6, 0.42, 0.9, 0.17);
+    },
+    // the wheel says no: a comedy slide down
+    spinNone() {
+      voice({ f: NOTE.G4, to: NOTE.C4 * 0.85, type: "sawtooth", dur: 0.75, bend: 0.7, vol: 0.34,
+        fc: 1400, fcTo: 420, q: 4, send: 0.35 });
+      voice({ f: NOTE.G4 / 2, to: NOTE.C4 * 0.42, type: "square", dur: 0.75, bend: 0.7, vol: 0.12, fc: 700 });
+    },
+    // a rival gets sent back: a falling sweep into an impact
+    sendBack() {
+      voice({ f: 900, to: 90, type: "sawtooth", dur: 0.55, bend: 0.5, vol: 0.14, fc: 3000, fcTo: 260, q: 5, send: 0.35 });
+      noise({ dur: 0.5, fc: 3000, fcTo: 200, q: 0.8, vol: 0.1, send: 0.3 });
+      voice({ f: 130, to: 44, type: "sine", at: 0.42, dur: 0.5, vol: 0.32, a: 0.003 });
+      noise({ at: 0.42, dur: 0.3, fc: 200, q: 0.6, vol: 0.12, send: 0.4 });
+    },
+    // white spade, anyone can steal it: a two-tone call with a snare build
+    allPlay() {
+      [0, 0.19, 0.38].forEach((at, i) => {
+        stab(i % 2 ? NOTE.G5 : NOTE.C5, at, 0.3, 0.19, 0.25);
+      });
+      let t = 0.05, gap = 0.055;
+      while (t < 0.62) { noise({ at: t, dur: 0.04, fc: 2200, q: 2, vol: 0.1 }); gap *= 0.93; t += gap; }
+      noise({ at: 0.62, dur: 0.5, fc: 6000, fcTo: 1200, q: 0.6, vol: 0.16, send: 0.5 });
+    },
+    // one turn from taking the game
+    finishLine() {
+      [NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6].forEach((f, i) => stab(f, i * 0.14, 0.6, 0.27));
+      noise({ at: 0.5, dur: 0.7, fc: 5000, fcTo: 1400, q: 0.6, vol: 0.15, send: 0.5 });
+    },
+    // game over: a proper fanfare with a tail
+    win() {
+      const hits = [[NOTE.C5, 0], [NOTE.E5, 0], [NOTE.G5, 0], [NOTE.G5, 0.2], [NOTE.C6, 0.4],
+                    [NOTE.E6, 0.4], [NOTE.G6, 0.62], [NOTE.C6, 0.62]];
+      hits.forEach(([f, at]) => stab(f, at, 1.1, 0.2));
+      [NOTE.C6, NOTE.D6, NOTE.E6, NOTE.G6, NOTE.C7].forEach((f, i) =>
+        voice({ f, type: "triangle", at: 0.85 + i * 0.085, dur: 0.9, vol: 0.2, a: 0.003, send: 0.55 }));
+      noise({ dur: 1.6, fc: 7000, fcTo: 900, q: 0.5, vol: 0.17, send: 0.6 });
+      voice({ f: 65.4, type: "sine", dur: 1.6, vol: 0.3, a: 0.01 });
+      voice({ f: 130.8, type: "triangle", at: 0.62, dur: 1.6, vol: 0.12, a: 0.01, send: 0.3 });
+    },
+  };
+  return SFX;
+}
+
 // Browsers block audio until the page has been interacted with, so we create the
 // context lazily, retry on any click/key, and surface a small unmute button only
 // while it's actually blocked.
-let audioCtx = null;
+let audioCtx = null, SFX_LIVE = null;
 function audioReady() {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") audioCtx.resume();
   } catch (e) { return false; }
   const ok = audioCtx && audioCtx.state === "running";
+  if (ok && !SFX_LIVE) SFX_LIVE = createAudio(audioCtx, audioCtx.destination);
   const btn = document.getElementById("soundBtn");
   if (btn) btn.style.display = ok ? "none" : "";
   return ok;
 }
-// One voice for every sound on the board: an oscillator with an attack/decay
-// envelope. Everything below is built from it, so the whole board sounds like
-// one instrument rather than a pile of borrowed noises.
-function tone(freq, at, dur, opts) {
-  if (!audioCtx) return;
-  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-  const c = opts || {}, t0 = audioCtx.currentTime + (at || 0), vol = c.vol == null ? 0.22 : c.vol;
-  o.type = c.type || "sine";
-  o.frequency.setValueAtTime(freq, t0);
-  if (c.to) o.frequency.exponentialRampToValueAtTime(Math.max(20, c.to), t0 + dur);
-  o.connect(g); g.connect(audioCtx.destination);
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(vol, t0 + Math.min(0.03, dur * 0.3));
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  o.start(t0); o.stop(t0 + dur + 0.02);
-}
-const play = (fn) => { if (audioReady()) fn(); };
-
-const SFX = {
-  // a turn begins: two rising notes, "here we go"
-  turnStart: () => play(() => { tone(440, 0, .12, {type:"triangle",vol:.16}); tone(660, .1, .16, {type:"triangle",vol:.18}); }),
-  // one space forward per correct answer — a short blip that climbs as the
-  // token walks, so a five-answer turn sounds like a run up the board
-  step: (n) => play(() => { for (let i = 0; i < n; i++) tone(520 + i * 70, i * 0.11, .1, {type:"triangle",vol:.17}); }),
-  // dragged backwards: the same idea in reverse and in a minor mood
-  stepBack: (n) => play(() => { for (let i = 0; i < n; i++) tone(360 - i * 60, i * 0.14, .16, {type:"sawtooth",vol:.15,to:250 - i*50}); }),
-  // last ten seconds: one tick a second, tightening at five
-  tick: (urgent) => play(() => tone(urgent ? 1180 : 880, 0, urgent ? .07 : .05, {type:"square",vol:urgent ? .16 : .1})),
-  // the wheel is spinning: a rising whirr under the animation
-  spinUp: () => play(() => { for (let i = 0; i < 14; i++) tone(300 + i * 45, i * 0.14, .12, {type:"sawtooth",vol:.09}); }),
-  // it paid out
-  spinWin: (places) => play(() => {
-    const base = places > 1 ? [523, 659, 784, 1047] : [523, 659, 784];
-    base.forEach((f, i) => tone(f, i * 0.09, .3, {type:"triangle",vol:.22}));
-  }),
-  spinNone: () => play(() => { tone(300, 0, .22, {type:"sine",vol:.16,to:180}); }),
-  // a rival got sent back
-  sendBack: () => play(() => { tone(420, 0, .5, {type:"sawtooth",vol:.2,to:120}); tone(210, .06, .5, {type:"square",vol:.1,to:70}); }),
-  // white spade, anyone can steal it
-  allPlay: () => play(() => { [784, 988, 784, 988].forEach((f, i) => tone(f, i * 0.11, .14, {type:"square",vol:.15})); }),
-  // a team is one turn from taking the game
-  finishLine: () => play(() => { [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.1, .35, {type:"triangle",vol:.2})); }),
-  // game over
-  win: () => play(() => {
-    [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.13, .6, {type:"triangle",vol:.24}));
-    [0, .26, .52].forEach(t => tone(1568, t + .55, .5, {type:"sine",vol:.14}));
-  }),
-};
-
-function playBuzzer() {
-  if (!audioReady()) return;                 // stays silent rather than throwing
-  [0, 0.30, 0.60].forEach((t, i) =>
-    tone(i === 2 ? 590 : 850, t, i === 2 ? 0.5 : 0.26, { type: "square", vol: 0.32 }));
-}
+// Every call goes through here: silent (never throwing) until audio is allowed.
+const SFX = new Proxy({}, { get: (_, k) => (...a) => {
+  if (!audioReady() || !SFX_LIVE || typeof SFX_LIVE[k] !== "function") return;
+  try { SFX_LIVE[k](...a); } catch (e) { /* never let a sound break the board */ }
+} });
+function playBuzzer() { SFX.buzzer(); }
 ["click", "keydown", "touchstart"].forEach(ev =>
   document.addEventListener(ev, audioReady, { passive: true }));
 
