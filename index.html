@@ -486,12 +486,18 @@
   .fxcanvas { position: absolute; inset: 0; width: 100%; height: 100%;
     z-index: 70; pointer-events: none; display: none; }
   .fxcanvas.on { display: block; }
-  /* lives in the empty band between the turn pill and the clock — never on
-     top of the countdown (the fxb dim below is a fallback for tight screens) */
-  .fxbanner { position: absolute; left: 50%; top: 19%; z-index: 71; pointer-events: none;
+  /* Sits in the open space UNDER the turn pill, over the countdown ring, which
+     the fxb rule below dims to almost nothing while a banner is up. `top` is
+     the banner's centre, and the 155px floor keeps even a two-line banner off
+     the pill on a short phone — covering the team name was the old bug. */
+  .fxbanner { position: absolute; left: 50%; top: max(30%, 155px); z-index: 71; pointer-events: none;
     transform: translate(-50%, -50%); text-align: center; white-space: nowrap;
     font-size: 38px; font-weight: 900; letter-spacing: -.5px; opacity: 0; color: #fff;
     text-shadow: 0 0 24px rgba(0,229,255,.75), 0 0 60px rgba(138,43,226,.65), 0 6px 30px rgba(0,0,0,.8); }
+  /* Its own pool of darkness, so it reads over the ring underneath whatever
+     else is going on — the dim below is a bonus, not the thing holding it up. */
+  .fxbanner::before { content: ""; position: absolute; inset: -34px -70px; z-index: -1;
+    background: radial-gradient(58% 68% at 50% 50%, rgba(4,6,12,.94) 0%, rgba(4,6,12,.8) 48%, rgba(4,6,12,0) 100%); }
   .fxbanner small { display: block; margin-top: 8px; font-size: 13px; letter-spacing: .22em;
     text-transform: uppercase; color: #c2cde6; text-shadow: 0 2px 14px rgba(0,0,0,.8); }
   .fxbanner.go { animation: fxpop var(--bd, 2s) cubic-bezier(.2,1.4,.4,1) both; }
@@ -789,6 +795,15 @@
   .gpanel > h4 { margin: 0 0 12px; font-size: 10.5px; font-weight: 900; letter-spacing: .16em;
     text-transform: uppercase; color: #7f8db0; text-align: center; }
 
+  /* Spinner payout: take the places, or take them off someone */
+  .spinpick .gbtn { margin: 0; }
+  .spor { margin: 13px 0 11px; text-align: center; font-size: 11px; font-weight: 900;
+    letter-spacing: .16em; text-transform: uppercase; color: #7f8db0; }
+  .spback { display: flex; flex-direction: column; gap: 8px; }
+  .spback .gbtn { width: 100%; flex: none; justify-content: flex-start; gap: 11px; padding: 15px 17px; }
+  .tdot { width: 13px; height: 13px; border-radius: 50%; flex: none;
+    background: linear-gradient(140deg, var(--t1), var(--t2)); }
+
   /* Whose turn — ONE pill: dot, role, board position. Full scores live on
      the TV board and the winners page; four pills of numbers were noise. */
   .upbar { margin: 0 auto; width: fit-content; max-width: 100%; display: flex;
@@ -939,7 +954,14 @@
     background: linear-gradient(180deg, rgba(12,17,32,.92), rgba(8,11,24,.92)) padding-box,
                 linear-gradient(140deg, var(--t1), var(--t2)) border-box; }
   .tcard-h { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
-  .tcard .tname { border: none; background: rgba(255,255,255,.05); }
+  /* The team name is editable and nobody could tell: it looked like a label.
+     Dashed edge plus a pencil says "tap me", and it lights up like a field the
+     moment it has focus. */
+  .tcard .tname { border: 1.5px dashed rgba(255,255,255,.22); background: rgba(255,255,255,.05);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.45)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 20h4l10-10-4-4L4 16Z'/><path d='m14.5 5.5 4 4'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center; background-size: 15px 15px;
+    padding-right: 32px; }
+  .tcard .tname:focus { border-style: solid; background-image: none; padding-right: 11px; }
   .tmem { display: flex; flex-wrap: wrap; gap: 7px; }
   .tmem .who { border-radius: 999px; padding: 8px 13px; font-weight: 800; font-size: 13px;
     border: 2px solid transparent; cursor: pointer; color: #fff;

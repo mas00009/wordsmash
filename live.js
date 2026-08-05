@@ -46,7 +46,7 @@
     });
   }
   let timeUpKey = 0;   // so the time-up buzz fires once per turn
-  let spinFxKey = "", stealFxKey = "", overFx = false;   // celebrate each event once
+  let spinFxKey = "", spinOutKey = "", stealFxKey = "", overFx = false;   // celebrate each event once
   let spinRevealT = 0;                                   // build-up -> reveal timer
   const demoStore = { session: null, entries: {} };
 
@@ -212,7 +212,7 @@
       // reshuffles every category for this game only, so the same deck never
       // deals the same run of words twice
       seed: Math.random().toString(36).slice(2, 10),
-      control: null, spinResult: null, fromSpade: false };
+      control: null, spinResult: null, spinPick: null, spinOutcome: null, fromSpade: false };
   }
 
   async function hostGame() {
@@ -255,7 +255,7 @@
 
   function leaveLive() {
     stopPoll(); liveCode = null; S = null; liveMode = "none"; lastKey = "";
-    spinFxKey = stealFxKey = ""; overFx = false;
+    spinFxKey = spinOutKey = stealFxKey = ""; overFx = false;
     demo = false; solo = false; demoStore.session = null; demoStore.entries = {};
     title(""); closeLive();
     if (typeof renderPlayer === "function") renderPlayer();
@@ -415,13 +415,16 @@
       if (expect && st.timerEnds !== expect) return null;
       const W = B(), n = st.teams.length;
       const i = (st.activeTeam || 0) % n, t = st.teams[i];
-      st.spinResult = null; st.fromSpade = false;
+      st.spinResult = null; st.spinOutcome = null; st.fromSpade = false;
       t.pos = (t.pos | 0) + (st.correct || 0);
 
+      let pending = null;
       if (st.correct > 0 && t.pos < W.WIN_POS && W.isSpinner(t.pos)) {
         const res = W.spin();
-        if (res.places) t.pos += res.places;
         st.spinResult = { id: Date.now(), label: res.label, places: res.places, angle: Math.floor(Math.random() * 360) };
+        // A payout is no longer applied on the spot: the team that earned it
+        // chooses whether to take the places or take them off somebody else.
+        if (res.places) pending = { team: i, places: res.places, id: st.spinResult.id };
       }
       t.turnIdx = (t.turnIdx || 0) + 1;
       st.turnActive = false; st.timerEnds = 0; st.correct = 0;
@@ -430,23 +433,54 @@
       // described must never see it again
       st.ptr = (st.ptr || 0) + 1;
 
-      if (t.pos >= W.WIN_POS) {           // control turn for the win
-        t.pos = W.WIN_POS;
-        st.phase = "control"; st.control = { mode: "finish", team: i };
-        return st;
-      }
-      const ni = (i + 1) % n, nt = st.teams[ni];
-      st.activeTeam = ni;
-      if (nt.pos >= W.WIN_POS) {          // already on FINISH -> retry the control turn
-        st.phase = "control"; st.control = { mode: "finish", team: ni };
-      } else if (W.isSpade(nt.pos)) {     // white spade -> all play
-        st.phase = "control"; st.control = { mode: "spade", team: ni };
-      } else {
-        st.cat = W.catAt(nt.pos);
-      }
-      return st;
+      if (pending) { st.spinPick = pending; return st; }   // hand over to the choice
+      return advanceAfterTurn(st, i);
     });
     myStrokes = []; acting = false;
+  }
+
+  // Everything that happens once the turn's movement is final: the finish
+  // check, then whose turn is next and what kind of turn it is. Split out of
+  // endTurn because a spinner payout pauses in between for the team to choose.
+  function advanceAfterTurn(st, i) {
+    const W = B(), n = st.teams.length, t = st.teams[i];
+    if (t.pos >= W.WIN_POS) {           // control turn for the win
+      t.pos = W.WIN_POS;
+      st.phase = "control"; st.control = { mode: "finish", team: i };
+      return st;
+    }
+    const ni = (i + 1) % n, nt = st.teams[ni];
+    st.activeTeam = ni;
+    if (nt.pos >= W.WIN_POS) {          // already on FINISH -> retry the control turn
+      st.phase = "control"; st.control = { mode: "finish", team: ni };
+    } else if (W.isSpade(nt.pos)) {     // white spade -> all play
+      st.phase = "control"; st.control = { mode: "spade", team: ni };
+    } else {
+      st.cat = W.catAt(nt.pos);
+    }
+    return st;
+  }
+
+  // The spinner paid out and the team is choosing what to do with it: take the
+  // places themselves, or knock that many off another team.
+  async function resolveSpin(mode, targetIdx) {
+    if (acting) return; acting = true;
+    await mutate(st => {
+      const p = st.spinPick;
+      if (!p) return null;                       // someone else already chose
+      const n = st.teams.length, i = p.team % n;
+      if (mode === "back" && targetIdx != null && (targetIdx % n) !== i) {
+        const j = targetIdx % n, tgt = st.teams[j];
+        tgt.pos = Math.max(0, (tgt.pos | 0) - p.places);
+        st.spinOutcome = { kind: "back", team: j, by: i, places: p.places, id: p.id };
+      } else {
+        st.teams[i].pos = (st.teams[i].pos | 0) + p.places;
+        st.spinOutcome = { kind: "forward", team: i, places: p.places, id: p.id };
+      }
+      st.spinPick = null;
+      return advanceAfterTurn(st, i);
+    });
+    acting = false;
   }
 
   // Control turn resolved: whichever team guessed first takes the turn.
@@ -455,6 +489,11 @@
     if (acting) return; acting = true;
     await mutate(st => {
       const W = M(), c = st.control || {};
+      // The describer of the control turn has now had their go, so their team's
+      // rotation moves on. Without this a team that keeps winning all-plays (or
+      // keeps retrying the finish) hands the phone to the same person forever.
+      const ct = st.teams[(c.team | 0) % st.teams.length];
+      if (ct) ct.turnIdx = (ct.turnIdx || 0) + 1;
       if (c.mode === "finish" && teamIdx === c.team) { st.phase = "over"; st.control = null; return st; }
       st.phase = "play"; st.control = null;
       st.activeTeam = teamIdx;
@@ -474,7 +513,7 @@
   function renderLive() {
     if (liveMode !== "session" || !S) return;
     const st = S.state;
-    const key = [st.phase, (st.control && st.control.mode) || "", activeTeamIdx(), st.turnActive, amDescriber(), st.cat, st.ptr, st.clearSeq, st.skipsUsed, teams().length, st.teams.map(t => (t.members || []).length).join(",")].join("|");
+    const key = [st.phase, (st.control && st.control.mode) || "", activeTeamIdx(), st.turnActive, amDescriber(), st.cat, st.ptr, st.clearSeq, st.skipsUsed, (st.spinPick && st.spinPick.id) || "", teams().length, st.teams.map(t => (t.members || []).length).join(",")].join("|");
     if (key !== lastKey) {
       // a banner mid-pop straddling a screen change reads as a glitch
       if (lastKey && lastKey.split("|")[0] !== st.phase && window.FX && FX.soften) FX.soften();
@@ -531,7 +570,35 @@
     if (st.phase === "teams") return buildTeams();
     if (st.phase === "control") return buildControl();
     if (st.phase === "over") return buildOver();
+    if (st.spinPick) return buildSpinPick();
     return buildPlay();
+  }
+
+  // The spinner paid out. The team that earned it takes the places, or takes
+  // them off a rival. Everyone else watches it happen.
+  function buildSpinPick() {
+    const st = S.state, T = teams(), p = st.spinPick;
+    const i = (p.team | 0) % T.length, t = T[i];
+    const mine = myTeamIdx() === i, n = p.places;
+    title(""); tint();
+    const others = T.map((x, j) => ({ x, j })).filter(o => o.j !== i);
+    const body = mine
+      ? `<div class="gpanel spinpick"><h4>Take it or take it off them</h4>
+          <button class="gbtn" id="spFwd" style="width:100%">Move us forward +${n}</button>
+          <p class="spor">or knock ${n} off</p>
+          <div class="spback">${others.map(o => `<button class="gbtn ghost" data-j="${o.j}" style="${teamVars(o.j)}">
+            <i class="tdot" style="${teamVars(o.j)}"></i>${esc(o.x.name)} &minus;${n}</button>`).join("")}</div></div>`
+      : `<div class="gbtn wait">${esc(t.name)} are deciding…</div>`;
+    inner().innerHTML = `<div class="gs">
+      ${head("+" + n + (n > 1 ? " places" : " place"), t.name + " landed on the spinner")}
+      <div class="gs-body mid">${body}</div>
+      <div class="gs-foot"></div>
+    </div>`;
+    headerClose(leaveLive);
+    if (mine) {
+      $("spFwd").onclick = () => resolveSpin("forward");
+      inner().querySelectorAll(".spback button").forEach(b => b.onclick = () => resolveSpin("back", +b.dataset.j));
+    }
   }
 
   // One line telling the room what they're in for, so nobody is surprised
@@ -604,7 +671,7 @@
       return;
     }
     inner().innerHTML = `<div class="gs">
-      ${head("Teams", solo ? "You against the bots. Tap a name to move it" : "Tap a player to move them between teams")}
+      ${head("Teams", solo ? "You against the bots. Tap a name to move it" : "Tap a team name to rename it, tap a player to move them")}
       <div class="gs-body">
         <div class="gpanel"><h4>How many teams</h4>
           <div class="tcount" id="teamCount">${[2, 3, 4].map(n => `<button class="${T.length === n ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>
@@ -631,7 +698,13 @@
       + (loose.length ? `<div class="gpanel"><h4>Not on a team</h4><div class="tmem" style="--t1:#39414f;--t2:#12161d">${
           loose.map(p => `<button class="who" data-pid="${p.id}">${esc(p.name)}</button>`).join("")}</div></div>` : "");
     wrap.querySelectorAll(".who[data-pid]").forEach(el => el.onclick = () => cyclePlayer(el.dataset.pid));
-    wrap.querySelectorAll("input.tname").forEach(el => el.onchange = () => renameTeam(+el.dataset.i, el.value));
+    // Commit as they type (debounced) as well as on blur: tapping straight from
+    // the name field to "Start game" used to lose the last edit on some phones.
+    wrap.querySelectorAll("input.tname").forEach(el => {
+      let t = 0;
+      el.oninput = () => { clearTimeout(t); t = setTimeout(() => renameTeam(+el.dataset.i, el.value), 600); };
+      el.onchange = () => { clearTimeout(t); renameTeam(+el.dataset.i, el.value); };
+    });
   }
 
   // ---------- the turn ----------
@@ -838,6 +911,23 @@
 
   function updateDynamic() {
     const st = S.state;
+    // The spinner choice landed. Announce it wherever we now are — taking the
+    // places yourself and sending a rival back are worth different noises.
+    if (st.spinOutcome) {
+      const k = liveCode + "|out|" + st.spinOutcome.id;
+      if (spinOutKey !== k) {
+        spinOutKey = k;
+        const o = st.spinOutcome, T = teams(), nm = (T[o.team] || {}).name || "They";
+        if (o.kind === "back") {
+          FX.banner(nm + " −" + o.places, "sent backwards", 2600);
+          buzz([160, 80, 160]);
+        } else {
+          FX.fireworks(2200);
+          FX.banner("+" + o.places + (o.places > 1 ? " places" : " place"), "taken", 2200);
+          buzz([90, 60, 200]);
+        }
+      }
+    }
     if (st.phase === "lobby") {
       const pl = $("livePlayers");
       if (pl) pl.innerHTML = players().map(p => `<span class="who ${p.id === userId ? "me" : ""}">${esc(p.name)}${p.id === S.host ? " · host" : ""}</span>`).join("")
@@ -862,7 +952,7 @@
           spinRevealT = setTimeout(() => {
             if (places > 0) {
               FX.fireworks(2600);
-              FX.banner("+" + places + (places > 1 ? " PLACES!" : " PLACE!"), "spinner bonus");
+              FX.banner("+" + places + (places > 1 ? " PLACES!" : " PLACE!"), "take it or give it");
               buzz([90, 60, 90, 60, 260]);
             } else {
               FX.banner("No bonus", "the wheel says no");
@@ -985,6 +1075,24 @@
   function soloBots() {
     const st = S && S.state;
     if (!st || st.phase !== "play") return;
+    // a bot team that won the spinner decides for itself: mostly takes the
+    // places, sometimes knocks them off whoever is in front
+    if (st.spinPick) {
+      const T = st.teams, i = (st.spinPick.team | 0) % T.length;
+      if ((T[i].members || []).some(m => m.indexOf("bot") === 0) && !(T[i].members || []).includes(userId)) {
+        const key = "pick|" + st.spinPick.id;
+        if (botGuard !== key) {
+          botGuard = key;
+          setTimeout(() => {
+            const cur = S && S.state;
+            if (!cur || !cur.spinPick || cur.spinPick.id !== st.spinPick.id) return;
+            const lead = T.map((t, j) => ({ t, j })).filter(o => o.j !== i).sort((a, b) => (b.t.pos | 0) - (a.t.pos | 0))[0];
+            if (lead && Math.random() < 0.4) resolveSpin("back", lead.j); else resolveSpin("forward");
+          }, 1400 + Math.random() * 900);
+        }
+      }
+      return;
+    }
     const d = describerId();
     if (!d || d.indexOf("bot") !== 0) return;
     const key = st.clearSeq + "|" + st.turnActive;
