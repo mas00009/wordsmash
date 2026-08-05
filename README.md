@@ -113,7 +113,7 @@ A persistent crew profile (*Aussie, born early '80s, love American pop culture*)
 
 The menu is **🃏 Decks**, **🕐 Game settings**, **✨ Create a new deck**, **♻️ Reset game** and **🔑 AI key** — sections expand in place rather than opening a separate page. **Game settings** is game length (Full 48 / Quick 24) and skips per turn (0–3). They live in `localStorage` on the host's device and are **baked into the room state when it's created**, so everyone plays the host's game and changing a setting can never move the finish line of a game already running. The lobby prints the terms under the room code ("QUICK GAME · 24 SPACES · ONE SKIP A TURN") so nobody is surprised 20 minutes in. Expanding Decks lists the 10 built-in decks. **✨ Create a new deck** is a free-text brief plus Difficulty and Audience — format and card count aren't settings: every card is a Word Smash word across all 7 categories, and every deck is **210 cards** (30 per category), generated in 2 batches of 105. Picking a deck opens **All cards** so you can review it before hosting.
 
-**Deck size and why it matters.** A 48-space game runs ~40 turns spread over 7 categories, so one category comes up ~6 times and, at ~6 cards a turn, a single game draws **about 40 cards out of one category**. At 30 a category the pool ran dry mid-game and started repeating — which is exactly what happened the first time it was played with a family. Expanded decks hold **100 a category (700 a deck)**, so a whole game uses under half the pool and cannot repeat.
+**Deck size and why it matters.** A 48-space game runs ~40 turns spread over 7 categories, so one category comes up ~6 times and, at ~6 cards a turn, a single game draws **about 40 cards out of one category**. At 30 a category the pool ran dry mid-game and started repeating — which is exactly what happened the first time it was played with a family. Every deck now holds **200 a category (1,400 a deck)**, so a whole game uses under a quarter of the pool and cannot repeat. Checked across all 70 deck/category pairs: a game's worth of draws produces zero repeats.
 
 ## Files
 
@@ -122,7 +122,7 @@ The menu is **🃏 Decks**, **🕐 Game settings**, **✨ Create a new deck**, *
 | `index.html` | The phone app (UI + logic) |
 | `wordsmash.js` | Board + category definitions (shared by app and board view) |
 | `live.js` | Live multiplayer: rooms, polling sync, turn flow, team setup, drawing, local demo |
-| `decks.js` | 10 built-in decks, growing to **200 words a category (1,400 a deck)**. Done: Around the House. At 100: 80s & 90s, Aussie Everything, Kids Zone. Still at 30: Movies & TV, Sports Legends, Music Icons, Food & Drink, Adults After Dark, Classic Mixed Bag. Run `node tools/deckcheck.js` for the live tally |
+| `decks.js` | 10 built-in decks, **200 words a category — 1,400 cards a deck, 14,000 in total**. Run `node tools/deckcheck.js` to verify |
 | `tools/deckcheck.js` | Deck integrity check. Reports per deck and category: count, duplicates, and how many words short of target. `--fix` drops duplicates and trims overflow (it never invents words). 14,000 hand-written strings is past what anyone can keep straight by eye |
 | `board.html` | TV/laptop board display |
 | `qr.js` | Self-contained QR generator (MIT, Kazuhiko Arase) |
