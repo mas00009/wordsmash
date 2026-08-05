@@ -406,10 +406,13 @@
   // mutation drops out if the turn has already moved on. Manual End presses pass
   // nothing, so the host can always force a turn along.
   async function endTurn(expectEnds) {
+    // This is bound straight to onclick in two places, so what arrives here can
+    // be a MouseEvent rather than a deadline. Only a real timestamp guards.
+    const expect = typeof expectEnds === "number" ? expectEnds : 0;
     if (acting) return; acting = true;
     dropUndo();
     await mutate(st => {
-      if (expectEnds && st.timerEnds !== expectEnds) return null;
+      if (expect && st.timerEnds !== expect) return null;
       const W = B(), n = st.teams.length;
       const i = (st.activeTeam || 0) % n, t = st.teams[i];
       st.spinResult = null; st.fromSpade = false;
