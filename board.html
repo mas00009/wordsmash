@@ -31,6 +31,21 @@
     transform:translateY(-3px);opacity:.85;}
   .addcode:hover{opacity:1;}
   .addcode:active{transform:translateY(-3px) scale(.9);}
+  .soundveil{position:fixed;inset:0;z-index:900;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(60% 60% at 50% 45%,rgba(7,10,18,.86),rgba(4,6,12,.96));
+    cursor:pointer;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+    /* opacity is NOT animated: a filled entry animation renders the whole thing
+       invisible wherever animations are throttled. The scale is decoration. */
+    opacity:1;animation:svin .35s cubic-bezier(.2,1.3,.4,1);}
+  .soundveil[hidden]{display:none;}
+  .soundveil.out{opacity:0;transition:opacity .3s;pointer-events:none;}
+  .sv-inner{text-align:center;padding:0 24px;}
+  .sv-icon{font-size:78px;line-height:1;margin-bottom:22px;animation:svpulse 1.8s ease-in-out infinite;}
+  .sv-title{font-size:44px;font-weight:900;letter-spacing:-.5px;color:#fff;
+    text-shadow:0 0 30px rgba(0,229,255,.55),0 0 70px rgba(138,43,226,.45);}
+  .sv-sub{margin-top:14px;font-size:17px;font-weight:700;letter-spacing:.06em;color:#8f9dbd;}
+  @keyframes svin{from{transform:scale(1.04)}to{transform:none}}
+  @keyframes svpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
   #codeIn{width:170px;background:transparent;border:none;border-bottom:2px solid var(--cyan);
     color:var(--cyan);font:inherit;font-size:34px;font-weight:900;letter-spacing:8px;
     text-align:right;text-transform:uppercase;outline:none;}
@@ -122,11 +137,23 @@
       <div class="lbl">Room</div>
       <div class="coderow">
         <div class="val" id="code">----</div>
-        <button class="addcode" id="soundBtn" title="Enable sound" aria-label="Enable sound" style="display:none">🔇</button>
+        <button class="addcode" id="soundBtn" title="Sound" aria-label="Sound">🔊</button>
         <button class="addcode" id="addCode" title="Enter room code" aria-label="Enter room code">+</button>
       </div>
     </div>
   </header>
+
+  <!-- Sound is ON by default, but a browser will not start audio until someone
+       interacts with the page — and nobody ever touches a board sitting on a TV.
+       So instead of a small mute icon in a corner that goes unnoticed, the whole
+       screen asks once, and the first touch anywhere anywhere starts it. -->
+  <div class="soundveil" id="soundVeil" hidden>
+    <div class="sv-inner">
+      <div class="sv-icon">🔊</div>
+      <div class="sv-title">Tap anywhere for sound</div>
+      <div class="sv-sub">Your browser needs one tap before it will play audio</div>
+    </div>
+  </div>
   <div class="divider"></div>
 
   <main>
@@ -192,8 +219,6 @@ function askForCode() {
   inp.addEventListener("blur", cancel);
 }
 $("addCode").addEventListener("click", askForCode);
-$("soundBtn").addEventListener("click", audioReady);
-audioReady();   // reveals the unmute button if the browser is blocking us
 
 // --- board audio ------------------------------------------------------------
 // Everything the board plays is synthesised here: no sample files to load, no
@@ -402,29 +427,76 @@ function createAudio(ctx, dest) {
   return SFX;
 }
 
-// Browsers block audio until the page has been interacted with, so we create the
-// context lazily, retry on any click/key, and surface a small unmute button only
-// while it's actually blocked.
-let audioCtx = null, SFX_LIVE = null;
+// Sound is ON by default and stays on: the only thing standing in the way is
+// the browser's rule that audio cannot start until someone interacts with the
+// page. A board on a TV never gets touched, so waiting for a click on a small
+// icon meant it stayed silent all night. Instead the whole screen asks once,
+// any touch or key anywhere satisfies the browser, and the answer is remembered
+// so it never asks again on this device unless the user deliberately mutes.
+const MUTE_KEY = "masgames_board_mute";
+let audioCtx = null, SFX_LIVE = null, muted = localStorage.getItem(MUTE_KEY) === "1";
+
+function ctxRunning() { return !!audioCtx && audioCtx.state === "running"; }
+
+// Try to start (or restart) audio. Safe to call from anywhere, any number of
+// times — outside a real gesture the browser simply leaves it suspended.
 function audioReady() {
+  if (muted) return false;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") audioCtx.resume();
+    if (audioCtx.state === "suspended") {
+      // resume() settles asynchronously, so repaint when it actually starts —
+      // otherwise the prompt hangs around for a beat after the tap that worked
+      const p = audioCtx.resume();
+      if (p && p.then) p.then(() => { if (ctxRunning() && !SFX_LIVE) SFX_LIVE = createAudio(audioCtx, audioCtx.destination); paintSound(); }).catch(() => {});
+    }
   } catch (e) { return false; }
-  const ok = audioCtx && audioCtx.state === "running";
+  const ok = ctxRunning();
   if (ok && !SFX_LIVE) SFX_LIVE = createAudio(audioCtx, audioCtx.destination);
-  const btn = document.getElementById("soundBtn");
-  if (btn) btn.style.display = ok ? "none" : "";
+  paintSound();
   return ok;
 }
+
+function paintSound() {
+  const btn = document.getElementById("soundBtn"), veil = document.getElementById("soundVeil");
+  if (btn) { btn.textContent = muted ? "🔇" : "🔊"; btn.style.opacity = muted ? ".45" : ""; }
+  if (!veil) return;
+  // ask only when sound is wanted but the browser has not let it start yet
+  const need = !muted && !ctxRunning();
+  if (need && veil.hidden) { veil.hidden = false; veil.classList.remove("out"); }
+  if (!need && !veil.hidden) {
+    veil.classList.add("out");
+    setTimeout(() => { veil.hidden = true; veil.classList.remove("out"); }, 320);
+  }
+}
+
+// Any real gesture anywhere on the page is enough — they do not have to find a
+// button. Capture phase so a click on the board still counts.
+["pointerdown", "touchstart", "keydown", "click"].forEach(ev =>
+  document.addEventListener(ev, () => audioReady(), { passive: true, capture: true }));
+
+// The corner icon is now a deliberate mute toggle, not the way in.
+document.getElementById("soundBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  muted = !muted;
+  localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+  if (muted) { try { audioCtx && audioCtx.suspend(); } catch (e2) {} paintSound(); }
+  else audioReady();
+});
+
+// Some browsers hand back a running context a moment after the gesture, and a
+// tab coming back from the background can suspend it again. Keep the prompt and
+// the icon honest without anyone having to do anything.
+setInterval(() => { if (!muted && !ctxRunning()) audioReady(); else paintSound(); }, 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) audioReady(); });
+
 // Every call goes through here: silent (never throwing) until audio is allowed.
 const SFX = new Proxy({}, { get: (_, k) => (...a) => {
-  if (!audioReady() || !SFX_LIVE || typeof SFX_LIVE[k] !== "function") return;
+  if (muted || !ctxRunning() || !SFX_LIVE || typeof SFX_LIVE[k] !== "function") return;
   try { SFX_LIVE[k](...a); } catch (e) { /* never let a sound break the board */ }
 } });
 function playBuzzer() { SFX.buzzer(); }
-["click", "keydown", "touchstart"].forEach(ev =>
-  document.addEventListener(ev, audioReady, { passive: true }));
+audioReady();   // try immediately; shows the prompt if the browser says no
 
 function esc(s){ return String(s).replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
 function fmt(s){ s = Math.max(0, s|0); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
