@@ -237,7 +237,8 @@ const NOTE = { C3:130.81, G3:196, C4:261.63, D4:293.66, Eb4:311.13, E4:329.63, F
 function createAudio(ctx, dest) {
   // master bus: a touch of compression so a fanfare over a token run never
   // clips, and a reverb send that gives the room some size
-  const master = ctx.createGain(); master.gain.value = 0.85;
+  const master = ctx.createGain(); master.gain.value = 0.76;   // ~2.5dB spare: a long
+  // token run, the finish fanfare and a clock tick can all land together
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -14; comp.knee.value = 24; comp.ratio.value = 4;
   comp.attack.value = 0.004; comp.release.value = 0.25;
