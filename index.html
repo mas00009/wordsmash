@@ -795,6 +795,14 @@
   .gpanel > h4 { margin: 0 0 12px; font-size: 10.5px; font-weight: 900; letter-spacing: .16em;
     text-transform: uppercase; color: #7f8db0; text-align: center; }
 
+  /* While the wheel is still running on the TV, the phones show this instead of
+     the buttons — nobody chooses, or even sees the number, before it lands. */
+  .spinwait { text-align: center; padding: 26px 14px; }
+  .spinwheel { font-size: 62px; line-height: 1; animation: spinwait 1.1s linear infinite; }
+  .spinwaittxt { margin: 16px 0 0; font-size: 13px; font-weight: 900; letter-spacing: .18em;
+    text-transform: uppercase; color: #7f8db0; }
+  @keyframes spinwait { to { transform: rotate(360deg); } }
+
   /* Spinner payout: take the places, or take them off someone */
   .spinpick .gbtn { margin: 0; }
   .spor { margin: 13px 0 11px; text-align: center; font-size: 11px; font-weight: 900;

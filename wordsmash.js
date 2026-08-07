@@ -24,7 +24,7 @@
     NATURE: { label: "Nature", short: "NAT",  c1: "#43e97b", c2: "#16a34a", ink: "#04160a", verb: "Describe" },
     RANDOM: { label: "Random", short: "RND",  c1: "#ff2d55", c2: "#b5152f", ink: "#ffffff", verb: "Describe" },
     PERSON: { label: "Person", short: "PER",  c1: "#FFD100", c2: "#e08700", ink: "#1a1200", verb: "Describe" },
-    ACTION: { label: "Action", short: "ACT",  c1: "#ff7a1a", c2: "#d1490a", ink: "#1a0c00", verb: "Describe" },
+    ACTION: { label: "Action", short: "ACT",  c1: "#ff7a1a", c2: "#d1490a", ink: "#1a0c00", verb: "Act out" },
     WORLD:  { label: "World",  short: "WLD",  c1: "#4361ee", c2: "#2b3fb8", ink: "#ffffff", verb: "Describe" },
     DRAW:   { label: "Draw it", short: "DRW", c1: "#8A2BE2", c2: "#5b1a9a", ink: "#ffffff", verb: "Draw" },
     SPADE:  { label: "Spade · all play", short: "♠", c1: "#f2f6ff", c2: "#c9d6ee", ink: "#0B0F17", verb: "Describe" },

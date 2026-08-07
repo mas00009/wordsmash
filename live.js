@@ -47,7 +47,7 @@
   }
   let timeUpKey = 0;   // so the time-up buzz fires once per turn
   let spinFxKey = "", spinOutKey = "", stealFxKey = "", overFx = false;   // celebrate each event once
-  let spinRevealT = 0;                                   // build-up -> reveal timer
+  let spinRevealT = 0, spinHoldT = 0;                    // build-up -> hold -> reveal
   const demoStore = { session: null, entries: {} };
 
   myName = localStorage.getItem("masgames_name") || "";
@@ -208,7 +208,7 @@
     return { rev: 1, phase: "lobby", flow: "wordsmash", game: "wordsmash",
       teams: [], activeTeam: 0, cat: "OBJECT", ptr: 0, correct: 0,
       turnActive: false, timerEnds: 0, turnSeconds: M().TURN_SECONDS, clearSeq: 0,
-      boardLen: g.boardLen, skipsPerTurn: g.skipsPerTurn, skipsUsed: 0,
+      boardLen: g.boardLen, skipsPerTurn: g.skipsPerTurn, skipsUsed: 0, spinRevealAt: 0,
       // reshuffles every category for this game only, so the same deck never
       // deals the same run of words twice
       seed: Math.random().toString(36).slice(2, 10),
@@ -424,7 +424,12 @@
         st.spinResult = { id: Date.now(), label: res.label, places: res.places, angle: Math.floor(Math.random() * 360) };
         // A payout is no longer applied on the spot: the team that earned it
         // chooses whether to take the places or take them off somebody else.
-        if (res.places) pending = { team: i, places: res.places, id: st.spinResult.id };
+        if (res.places) {
+          pending = { team: i, places: res.places, id: st.spinResult.id };
+          // the wheel runs for about five and a half seconds on the TV; nobody
+          // gets to choose (or even see the number) until it lands
+          st.spinRevealAt = srvNow() + 5300;
+        }
       }
       t.turnIdx = (t.turnIdx || 0) + 1;
       st.turnActive = false; st.timerEnds = 0; st.correct = 0;
@@ -477,7 +482,7 @@
         st.teams[i].pos = (st.teams[i].pos | 0) + p.places;
         st.spinOutcome = { kind: "forward", team: i, places: p.places, id: p.id };
       }
-      st.spinPick = null;
+      st.spinPick = null; st.spinRevealAt = 0;
       return advanceAfterTurn(st, i);
     });
     acting = false;
@@ -513,7 +518,7 @@
   function renderLive() {
     if (liveMode !== "session" || !S) return;
     const st = S.state;
-    const key = [st.phase, (st.control && st.control.mode) || "", activeTeamIdx(), st.turnActive, amDescriber(), st.cat, st.ptr, st.clearSeq, st.skipsUsed, (st.spinPick && st.spinPick.id) || "", teams().length, st.teams.map(t => (t.members || []).length).join(",")].join("|");
+    const key = [st.phase, (st.control && st.control.mode) || "", activeTeamIdx(), st.turnActive, amDescriber(), st.cat, st.ptr, st.clearSeq, st.skipsUsed, (st.spinPick ? st.spinPick.id + (spinHeld() ? "|hold" : "|pick") : ""), teams().length, st.teams.map(t => (t.members || []).length).join(",")].join("|");
     if (key !== lastKey) {
       // a banner mid-pop straddling a screen change reads as a glitch
       if (lastKey && lastKey.split("|")[0] !== st.phase && window.FX && FX.soften) FX.soften();
@@ -576,11 +581,25 @@
 
   // The spinner paid out. The team that earned it takes the places, or takes
   // them off a rival. Everyone else watches it happen.
+  const spinHeld = () => { const st = S && S.state;
+    return !!(st && st.spinPick && st.spinRevealAt && srvNow() < st.spinRevealAt); };
+
   function buildSpinPick() {
     const st = S.state, T = teams(), p = st.spinPick;
     const i = (p.team | 0) % T.length, t = T[i];
     const mine = myTeamIdx() === i, n = p.places;
     title(""); tint();
+    if (spinHeld()) {
+      // the wheel is still going on the TV — everyone watches it together
+      inner().innerHTML = `<div class="gs">
+        ${head("Spin space!", t.name + " landed on the spinner")}
+        <div class="gs-body mid"><div class="gpanel spinwait">
+          <div class="spinwheel">🎯</div>
+          <p class="spinwaittxt">Watch the wheel…</p></div></div>
+        <div class="gs-foot"></div></div>`;
+      headerClose(leaveLive);
+      return;
+    }
     const others = T.map((x, j) => ({ x, j })).filter(o => o.j !== i);
     const body = mine
       ? `<div class="gpanel spinpick"><h4>Take it or take it off them</h4>
@@ -726,7 +745,7 @@
   function buildPlay() {
     const st = S.state, T = teams(), ti = activeTeamIdx(), t = T[ti];
     const C = M().CATEGORIES[st.cat] || M().CATEGORIES.OBJECT;
-    const isDraw = st.cat === "DRAW", mine = myTeamIdx(), me = amDescriber();
+    const isDraw = st.cat === "DRAW", isAct = st.cat === "ACTION", mine = myTeamIdx(), me = amDescriber();
     title(""); tint();
     const catName = st.cat === "SPADE" ? "All play" : C.label;
     const cvars = `--c1:${C.c1};--c2:${C.c2};--ink:${C.ink}`;
@@ -736,13 +755,13 @@
       main = `<div class="wordcard" style="${cvars}">
           <span class="cat">${esc(catName)}</span>
           <div class="w">${esc(currentWord())}</div>
-          <div class="v">${isDraw ? "Draw it. No words, no letters" : "Describe it. Don't say it"}</div>
+          <div class="v">${isDraw ? "Draw it. No words, no letters" : isAct ? "Act it out. No talking" : "Describe it. Don't say it"}</div>
         </div>` + (isDraw ? drawArea(true) : "");
     } else if (me) {
       main = `<div class="wordcard quiet" style="${cvars}">
           <span class="cat">${esc(catName)}</span>
           <div class="w"><span class="spark">✦</span> You're up! <span class="spark">✦</span></div>
-          <div class="v">${isDraw ? "You draw, they guess" : "You describe, they guess"}</div>
+          <div class="v">${isDraw ? "You draw, they guess" : isAct ? "You act it out, they guess" : "You describe, they guess"}</div>
         </div>`;
     } else if (st.turnActive && mine !== ti && mine !== -1) {
       // Other teams aren't guessing, so they get the answer too — half the fun
@@ -775,7 +794,8 @@
       <div class="gs-head" style="margin-bottom:15px">
         <div class="upbar ${mine === ti ? "mine" : "theirs"}" style="${teamVars(ti)}">
           <i></i><b>${
-            amDescriber() ? (st.turnActive ? "Your turn · describe!" : "Your turn · you describe")
+            amDescriber() ? (st.turnActive ? "Your turn · " + (isDraw ? "draw!" : isAct ? "act it out!" : "describe!")
+                                             : "Your turn · you " + (isDraw ? "draw" : isAct ? "act" : "describe"))
             : mine === ti ? (st.turnActive ? "Your turn · shout answers!" : "Your team is up")
             : esc(t.name) + (st.turnActive ? " are playing" : " are up next")
           }</b><small>${(t.pos | 0) + 1} / ${B().WIN_POS}</small>
@@ -919,8 +939,8 @@
         spinOutKey = k;
         const o = st.spinOutcome, T = teams(), nm = (T[o.team] || {}).name || "They";
         if (o.kind === "back") {
-          FX.banner(nm + " −" + o.places, "sent backwards", 2600);
-          buzz([160, 80, 160]);
+          FX.banner("−" + o.places + " " + nm, "knocked backwards", 3000);
+          buzz([220, 90, 220, 90, 380]);
         } else {
           FX.fireworks(2200);
           FX.banner("+" + o.places + (o.places > 1 ? " places" : " place"), "taken", 2200);
@@ -946,19 +966,28 @@
         if (spinFxKey !== k) {
           spinFxKey = k;
           const places = st.spinResult.places | 0;
-          FX.banner("Spin space!", "the wheel is spinning…", 2500);
+          // The wheel runs for five and a half seconds on the TV. The phones
+          // hold the room for the same stretch instead of blurting the result
+          // out: build, a beat of "wait for it", then the reveal on the landing.
+          FX.banner("Spin space!", "the wheel is spinning…", 2600);
           buzz([40, 50, 40, 50, 40]);
-          clearTimeout(spinRevealT);
+          clearTimeout(spinRevealT); clearTimeout(spinHoldT);
+          spinHoldT = setTimeout(() => {
+            FX.banner("Wait for it…", "", 2600);
+            buzz([25, 120, 25, 120, 25]);
+          }, 2700);
           spinRevealT = setTimeout(() => {
             if (places > 0) {
-              FX.fireworks(2600);
-              FX.banner("+" + places + (places > 1 ? " PLACES!" : " PLACE!"), "take it or give it");
+              FX.fireworks(3200);
+              // deliberately NOT "+1": they have not decided yet, and calling it
+              // a gain reads as a lie when they use it to shove someone back
+              FX.banner(places + (places > 1 ? " PLACES" : " PLACE"), "take it or give it", 2600);
               buzz([90, 60, 90, 60, 260]);
             } else {
               FX.banner("No bonus", "the wheel says no");
               buzz(60);
             }
-          }, 2400);
+          }, 5300);
         }
       }
       if (st.cat === "DRAW" && st.turnActive && !amDescriber()) redrawWatcher();

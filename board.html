@@ -94,6 +94,21 @@
   .spinpill{margin-top:10px;border-radius:12px;padding:10px 12px;text-align:center;font-weight:900;font-size:19px;
     background:#12251c;border:2px solid #43e97b;color:#43e97b;display:none;}
   .spinpill.mint{background:#0f2a26;border-color:#00FFC6;color:#00FFC6;}
+  /* a payout used AGAINST someone reads as damage, not a prize */
+  .spinpill.bad{background:#2b0d14;border-color:#ff2d55;color:#ff6b85;}
+  .spinpill.slam{animation:pillslam .45s cubic-bezier(.2,1.5,.35,1);}
+  /* while the wheel runs the board leans in: everything else steps back and
+     the centre breathes, so the result lands on a held breath */
+  .bsvg{transition:filter .5s ease,transform .5s ease;}
+  body.spinning .bsvg{filter:saturate(.55) brightness(.72);transform:scale(.985);}
+  body.spinning #hub{animation:hubbreathe 1.1s ease-in-out infinite;transform-origin:center;}
+  @keyframes hubbreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  .spinword{position:fixed;left:50%;top:11%;transform:translateX(-50%);z-index:80;
+    font-size:34px;font-weight:900;letter-spacing:.32em;text-transform:uppercase;color:#fff;display:none;
+    text-shadow:0 0 26px rgba(0,229,255,.75),0 0 60px rgba(138,43,226,.6);}
+  body.spinning .spinword{display:block;animation:spinword 1.1s ease-in-out infinite;}
+  @keyframes spinword{0%,100%{opacity:.55}50%{opacity:1}}
+  @keyframes pillslam{0%{transform:scale(1.5)}60%{transform:scale(.94)}100%{transform:none}}
   .catbig{display:inline-block;margin-top:12px;border-radius:14px;padding:11px 20px;font-weight:900;font-size:28px;white-space:nowrap;
     background:linear-gradient(160deg,var(--c1,#00E5FF),var(--c2,#8A2BE2));border:2px solid rgba(255,255,255,.3);}
   .catbig.hint{background:none;border:none;padding:0;color:var(--muted);font-size:15px;font-weight:700;}
@@ -147,6 +162,8 @@
        interacts with the page — and nobody ever touches a board sitting on a TV.
        So instead of a small mute icon in a corner that goes unnoticed, the whole
        screen asks once, and the first touch anywhere anywhere starts it. -->
+  <div class="spinword" id="spinWord">Spinning</div>
+
   <div class="soundveil" id="soundVeil" hidden>
     <div class="sv-inner">
       <div class="sv-icon">🔊</div>
@@ -369,14 +386,21 @@ function createAudio(ctx, dest) {
     },
     // the wheel: a ratchet that accelerates under a rising filtered pad
     spinUp() {
-      let t = 0, gap = 0.075;
-      while (t < 1.9) {
-        noise({ at: t, dur: 0.035, fc: 1500 + t * 900, q: 6, vol: 0.19 });
-        gap = Math.max(0.028, gap * 0.965);
+      // a real wheel: the ratchet races away, then drags as it loses momentum,
+      // and the last few clicks are far enough apart to hold the room
+      let t = 0, gap = 0.07;
+      while (t < 5.2) {
+        noise({ at: t, dur: 0.038, fc: 1400 + t * 260, q: 6, vol: t < 4.4 ? 0.19 : 0.24 });
+        gap = t < 1.4 ? Math.max(0.03, gap * 0.94)      // winding up
+            : t < 3.6 ? gap * 1.055                      // steady then easing
+            : gap * 1.19;                                // dragging to a stop
         t += gap;
       }
-      voice({ f: 90, to: 220, type: "sawtooth", dur: 2.0, vol: 0.15, a: 0.4,
-        fc: 250, fcTo: 3000, q: 2, send: 0.3 });
+      // riser underneath, climbing the whole way
+      voice({ f: 70, to: 300, type: "sawtooth", dur: 4.9, vol: 0.13, a: 1.6,
+        fc: 200, fcTo: 3400, q: 2.4, send: 0.32 });
+      // and a breath of held tension right before it lands
+      voice({ f: 880, to: 1200, type: "sine", at: 4.4, dur: 0.9, vol: 0.05, a: 0.5, send: 0.5 });
     },
     // it paid out: a major stab with a sparkle arpeggio over the top
     spinWin(places) {
@@ -603,12 +627,29 @@ function bandPath(a0, a1, r0, r1) {
 // The needle keeps a running angle so each spin travels forwards through a
 // couple of turns before easing onto the slice it wins on.
 let needleAngle = 0, lastSpinKey = "", animUntil = 0;
-function showSpinPill(sp) {
+let lastPillKey = "";
+function showSpinPill(sp, outcome, teams) {
   const pill = document.getElementById("spinPill");
   if (!pill) return;
-  pill.textContent = "🎯 Spinner: " + sp.label;
-  pill.className = "spinpill" + (sp.places === 2 ? " mint" : "");
+  let txt, cls, key;
+  if (outcome && outcome.kind === "back") {
+    // somebody just got shoved backwards — say so, in red, with their name
+    const who = ((teams || [])[outcome.team] || {}).name || "They";
+    txt = "💥 " + who + " −" + outcome.places;
+    cls = "spinpill bad"; key = "b" + outcome.id;
+  } else if (outcome) {
+    const who = ((teams || [])[outcome.team] || {}).name || "They";
+    txt = "🎯 " + who + " +" + outcome.places;
+    cls = "spinpill" + (outcome.places === 2 ? " mint" : ""); key = "f" + outcome.id;
+  } else {
+    // the wheel has paid out but the team has not said what they are doing yet
+    txt = "🎯 " + sp.label + " — take it or give it";
+    cls = "spinpill" + (sp.places === 2 ? " mint" : ""); key = "p" + (sp.id || sp.label);
+  }
+  pill.textContent = txt;
+  pill.className = cls + (key !== lastPillKey ? " slam" : "");
   pill.style.display = "block";
+  lastPillKey = key;
 }
 function hideSpinPill() {
   const pill = document.getElementById("spinPill");
@@ -629,12 +670,15 @@ function driveNeedle(isNewSpin) {
     }
     return;
   }
+  document.body.classList.add("spinning");
+  clearTimeout(window.__spinCls);
+  window.__spinCls = setTimeout(() => document.body.classList.remove("spinning"), 5450);
   el.style.transition = "none";
-  el.style.transform = `rotate(${needleAngle - 360 * 4}deg)`;
+  el.style.transform = `rotate(${needleAngle - 360 * 7}deg)`;
   setTimeout(() => {
     const n = document.getElementById("needle");
     if (!n) return;
-    n.style.transition = "transform 3.3s cubic-bezier(.12,.85,.10,1)";
+    n.style.transition = "transform 5.4s cubic-bezier(.08,.72,.06,1)";
     n.style.transform = `rotate(${needleAngle}deg)`;
   }, 24);
   // reveal the win only once the needle has stopped; a loss shows nothing at all
@@ -646,8 +690,9 @@ function driveNeedle(isNewSpin) {
     if (n) { n.style.transition = "opacity .3s ease"; n.style.opacity = "0"; }
     if (f) { f.classList.add("winflash"); f.setAttribute("opacity", "1"); }
     if (fw) { fw.classList.add("go"); fw.setAttribute("opacity", "1"); }
-    showSpinPill(S.state.spinResult);
-  }, 3380);
+    const stNow = S && S.state, o = stNow && stNow.spinOutcome;
+    showSpinPill(stNow.spinResult, (o && o.id === stNow.spinResult.id) ? o : null, stNow.teams);
+  }, 5450);
 }
 
 // Player pieces: flat button counters. Deliberately not 3D — just a rim, an
@@ -803,13 +848,17 @@ function drawBoard() {
   ).join("");
 
   const res = (S && S.state.spinResult) || null;
-  const key = S ? [res && res.slice, res && res.label, S.state.activeTeam, S.state.rev].join("|") : "";
+  // Identify a spin by the spin, not by the state revision. `rev` changes on
+  // EVERY mutation, so the moment the team chose what to do with their payout
+  // the wheel span all over again and its reveal timer then stomped the
+  // outcome pill back to "+1 place" — which is what everyone was reading.
+  const key = res ? String(res.id || (res.label + "|" + res.angle)) : "";
   const isNewSpin = !!res && key !== lastSpinKey;
   if (isNewSpin) {
     lastSpinKey = key;
     // always travel forwards, then settle on the winning slice
     needleAngle = Math.ceil((needleAngle + 720) / 360) * 360 + res.angle;
-    animUntil = Date.now() + 3400;
+    animUntil = Date.now() + 5600;   // the wheel gets a long, slowing run and a held beat
   }
   // don't rebuild mid-spin or the animation gets cut off
   if (!isNewSpin && Date.now() < animUntil) return;
@@ -969,8 +1018,10 @@ function drawSide() {
   // Hold the announcement back until the arrow has stopped — otherwise the TV
   // spoils the result mid-spin.
   const sp = st && st.spinResult;
-  if (sp && sp.places && Date.now() >= animUntil) showSpinPill(sp);
-  else hideSpinPill();
+  const out = st && st.spinOutcome;
+  if (out && out.id === (sp && sp.id)) showSpinPill(sp, out, st.teams);
+  else if (sp && sp.places && Date.now() >= animUntil) showSpinPill(sp, null, st.teams);
+  else { hideSpinPill(); lastPillKey = ""; }
 
   // nothing to show before a game starts: hide the readouts entirely
   const live = teams.length > 0;
@@ -1059,7 +1110,7 @@ function soundTheChange(prev, next) {
     heardSpin = b.spinResult.id;
     SFX.spinUp();
     const places = b.spinResult.places | 0;
-    setTimeout(() => (places > 0 ? SFX.spinWin(places) : SFX.spinNone()), 2000);
+    setTimeout(() => (places > 0 ? SFX.spinWin(places) : SFX.spinNone()), 5250);
   }
   // what the team did with it
   if (b.spinOutcome && b.spinOutcome.id !== heardOut) {
