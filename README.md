@@ -8,13 +8,14 @@ The board and rules follow the real **Articulate!** (Drumond Park), with our **D
 
 | Rule | Detail |
 |---|---|
-| Categories | **7**: Object · Nature · Random · Person · Action · World · **Draw** (ours) |
+| Categories | **7**: Object · Nature · Random · Person · **Action** (mime) · World · **Draw** (ours) — five are described, two are silent |
 | Start | Every team starts on **Object** |
 | Turn | **30 seconds** |
 | Movement | **1 space per correct answer** |
 | Next category | Set by the space you **land on** |
 | ♠ Spade (white) | **Control turn** — describe to *everyone*; the first team to guess **takes the turn** (then plays any category) |
 | 🎯 Spinner | Landing on an **Action (orange)** or **Random (red)** segment spins the centre wheel. It shares the board's segments and colours, so the inner wheel lines up radially with the outer ring. Nothing marks the paying slices — the needle spins and **the slice it lands on is the result**. A payout is not applied automatically: the team that earned it chooses to **take the places, or knock that many off a rival team**. Full board: +1 place (5 of 48, ~10%), +2 places (2 of 48, ~4%). Quick board: +1 (3 of 24, ~13%), +2 (1 of 24, ~4%) — a touch richer because there are half as many turns to land one. Those board spaces carry a ⟳ spin icon. |
+| Action | **Mimed, not described** — the card says "Act it out. No talking". Real Articulate describes Action words; ours is charades, because that is what everyone tries to do with a category called Action. All 2,000 Action words are short physical things a person can do standing up |
 | Draw | Describer **sketches** on a canvas that syncs to every phone |
 | Finish | Reaching/passing **FINISH** triggers a control turn — **you must win it to win**, otherwise you stay there and retry next turn. On the board it's the only cyan→purple space, capped with a chequered flag |
 | ⏭ Skip | **Rationed** — 1 per turn by default (0–3 in **⚙ → Game settings**). A spent skip stays in the row, dimmed, so the button under your thumb never moves mid-turn |
